@@ -1,0 +1,19 @@
+{
+  "name": "berkeley-student-information-system",
+  "version": "1.0.0",
+  "description": "Berkeley Student Information System - Full Stack Application",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=back-end\" \"npm run dev --workspace=front-end\"",
+    "dev:backend": "npm run dev --workspace=back-end",
+    "dev:frontend": "npm run dev --workspace=front-end",
+    "build": "npm run build --workspaces"
+  },
+  "workspaces": [
+    "back-end",
+    "front-end"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
