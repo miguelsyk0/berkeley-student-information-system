@@ -1,1 +1,0 @@
-# berkeley-student-information-system
