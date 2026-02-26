@@ -1,0 +1,43 @@
+# Node modules and build output
+/node_modules/
+/front-end/node_modules/
+/back-end/node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Environment files
+.env
+.env.*
+/back-end/.env
+/back-end/.env.*
+/front-end/.env
+/front-end/.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/editor files
+.vscode/
+.idea/
+
+# Others
+dist/
+build/
+
+# Ensure schema or sensitive data not committed by mistake
+/database/*.sql
+
+# Ignore the run-all batch if desired
+run-all.bat
