@@ -26,7 +26,7 @@ export default function LoginPage() {
       <div className="hidden md:flex md:w-1/2 shrink-0 flex-col justify-between p-12 text-white bg-black bg-[url('/berkeley-logo.jpg')] bg-cover bg-center relative">
         <div>
           <div className="flex items-center gap-2 text-2xl font-bold">
-            Berkeley School
+            Berkeley School Inc.
           </div>
           <div className="flex items-center gap-2 text-2xl">
             Student Information System

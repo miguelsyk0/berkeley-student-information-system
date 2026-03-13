@@ -114,12 +114,24 @@ export interface Subject {
   id: number;
   code: string;             // Internal code e.g. "LA", "SCI"
   name: string;             // School-specific name e.g. "Science Lab"
-  displayName: string;      // SF10 official DepEd name e.g. "Science"
-  isMapeh: boolean;         // True if this is a MAPEH sub-subject
+  displayName?: string;     // SF10 official DepEd name e.g. "Science"
+  isMapeh?: boolean;        // True if this is a MAPEH sub-subject
   mapehParentId?: number;   // If isMapeh, the id of the parent MAPEH subject
-  order: number;            // Display order in grade sheet
-  isActive: boolean;
+  order?: number;           // Display order in grade sheet
+  isActive?: boolean;
 }
+
+// Default values for Subject
+export const defaultSubject: Subject = {
+  id: 0,
+  code: "",
+  name: "",
+  displayName: "",
+  isMapeh: false,
+  mapehParentId: 0,
+  order: 0,
+  isActive: true,
+};
 
 // ── Grade Sheet Import Types ───────────────────────────────────────────────────
 
@@ -165,4 +177,14 @@ export interface ImportLog {
   rowsEncoded: number;
   rowsSkipped: number;
   errors: ValidationError[];
+}
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+
+export interface StudentGrade {
+  studentId: number;
+  lrn: string;
+  name: string;
+  grades: Record<string, number | null>;
 }

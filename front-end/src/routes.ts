@@ -38,9 +38,17 @@ export const ROUTES = {
   },
 
   grades: {
-    root:    "/grades",
-    student: "/grades/student",
+    root:           "/grades",
+    generalAverage: "/grades/general-average",
+    classSheet:     (sectionId?: number | string) =>
+      sectionId ? `/grades/class/${sectionId}` : "/grades/class",
+    studentView:    "/grades/student",
+    studentDetail:  (studentId: number | string) => `/grades/student/${studentId}`,
   },
 
-  sf10: "/sf10",
+  sf10: {
+    root:    "/sf10",
+    student: (studentId: number | string) => `/sf10/student/${studentId}`,
+    bulk:    "/sf10/bulk",
+  },
 } as const;

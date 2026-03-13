@@ -9,9 +9,9 @@ import Sidebar from "@/components/sidebar";
 // ── Mock Data ──────────────────────────────────────────────────────────────────
 
 const initialSchool = {
-  name: "Berkeley School",
+  name: "Berkeley School Inc.",
   schoolId: "481504",
-  district: "District IV",
+  district: "District X",
   division: "Baguio City",
   region: "CAR",
   address: "30 C.M. Recto St, Baguio, 2600 Benguet",

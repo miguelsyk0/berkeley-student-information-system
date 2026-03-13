@@ -189,14 +189,14 @@ export default function SubjectList() {
     .filter((s) => {
       const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
         s.code.toLowerCase().includes(search.toLowerCase()) ||
-        s.displayName.toLowerCase().includes(search.toLowerCase());
+        (s.displayName?.toLowerCase()?.includes(search.toLowerCase()) ?? false);
       const matchMapeh =
         filterMapeh === "all" ? true :
         filterMapeh === "mapeh" ? s.isMapeh :
         !s.isMapeh;
       return matchSearch && matchMapeh;
     })
-    .sort((a, b) => a.order - b.order);
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   function handleDelete(id: number) {
     setSubjects((prev) => prev.filter((s) => s.id !== id));
@@ -208,7 +208,7 @@ export default function SubjectList() {
 
   function handleMoveUp(id: number) {
     setSubjects((prev) => {
-      const sorted = [...prev].sort((a, b) => a.order - b.order);
+      const sorted = [...prev].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       const idx = sorted.findIndex((s) => s.id === id);
       if (idx <= 0) return prev;
       const next = sorted.map((s) => ({ ...s }));
@@ -219,7 +219,7 @@ export default function SubjectList() {
 
   function handleMoveDown(id: number) {
     setSubjects((prev) => {
-      const sorted = [...prev].sort((a, b) => a.order - b.order);
+      const sorted = [...prev].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       const idx = sorted.findIndex((s) => s.id === id);
       if (idx >= sorted.length - 1) return prev;
       const next = sorted.map((s) => ({ ...s }));
