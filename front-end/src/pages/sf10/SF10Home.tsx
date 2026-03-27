@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronRight, Search, Download, FileText, Eye,
@@ -8,16 +8,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Sidebar from "@/components/sidebar";
-import { SECTIONS, GRADE_COLORS, MOCK_STUDENTS } from "../encoding/MockData";
+import { GRADE_COLORS } from "@/utils/gradeUtils";
 import { ROUTES } from "@/routes";
+import { getStudents, getSections } from "@/services/api";
+import type { Student, Section } from "@/services/api";
 
 export default function SF10Home() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const [students, setStudents] = useState<Student[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
 
-  const filtered = MOCK_STUDENTS.filter(
+  useEffect(() => {
+    async function init() {
+      try {
+        const [stus, secs] = await Promise.all([getStudents(), getSections()]);
+        setStudents(stus);
+        setSections(secs);
+      } catch (err) {
+        console.error("Init failed", err);
+      }
+    }
+    init();
+  }, []);
+
+  const filtered = students.filter(
     (s) =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
       s.lrn.includes(search)
   );
 
@@ -85,22 +102,21 @@ export default function SF10Home() {
               <Card className="border-0 shadow-sm overflow-hidden">
                 {filtered.slice(0, 8).map((s) => (
                   <div
-                    key={s.studentId}
+                    key={s.id}
                     className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 cursor-pointer group"
-                    onClick={() => navigate(ROUTES.sf10.student(s.studentId))}
+                    onClick={() => navigate(ROUTES.sf10.student(s.id))}
                   >
                     <Avatar className="w-8 h-8 flex-shrink-0">
                       <AvatarFallback className="bg-teal-100 text-teal-800 text-xs font-bold">
-                        {s.name.split(",")[0]?.[0]}
-                        {s.name.split(" ").slice(-1)[0]?.[0]}
+                        {s.lastName[0]}{s.firstName[0]}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-700 truncate">{s.name}</p>
+                      <p className="text-sm font-semibold text-slate-700 truncate">{s.lastName}, {s.firstName}</p>
                       <p className="text-[11px] font-mono text-slate-400">{s.lrn}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${GRADE_COLORS[8]}`}>G8</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${GRADE_COLORS[7]}`}>G7</span>
                       <Button
                         size="sm" variant="outline"
                         className="h-6 text-[11px] px-2 gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -117,21 +133,21 @@ export default function SF10Home() {
             <div className="space-y-3">
               <p className="text-sm font-black text-slate-700">Sections</p>
               <div className="grid grid-cols-2 gap-2">
-                {SECTIONS.map((sec, i) => {
-                  const gl = [7, 7, 7, 8, 8, 9, 9, 10][i];
+                {sections.map((sec) => {
+                  const gl = sec.gradeLevel;
                   return (
                     <Card
-                      key={sec}
+                      key={sec.id}
                       className="border-0 shadow-sm hover:shadow-md transition-all cursor-pointer hover:-translate-y-0.5"
                       onClick={() => navigate(ROUTES.sf10.bulk)}
                     >
                       <CardContent className="px-4 py-3 flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${GRADE_COLORS[gl]}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${GRADE_COLORS[gl] || "bg-slate-100 text-slate-600"}`}>
                           <FileText className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-black text-slate-700">{sec}</p>
-                          <p className="text-[10px] text-slate-400">Grade {gl} · ~38 students</p>
+                          <p className="text-xs font-black text-slate-700">{sec.name}</p>
+                          <p className="text-[10px] text-slate-400">Grade {gl} · {sec.enrolledCount || 0} students</p>
                         </div>
                         <Download className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
                       </CardContent>

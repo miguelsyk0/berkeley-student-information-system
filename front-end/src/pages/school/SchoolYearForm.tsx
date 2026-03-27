@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CalendarDays, X, Save, Info } from "lucide-react";
+import { useState, useEffect } from "react";
+import { CalendarDays, Save, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,14 @@ interface SchoolYearFormProps {
   onClose: () => void;
   onSave: (data: Omit<SchoolYear, "id" | "quarters"> & { quarters: Omit<Quarter, "id" | "schoolYearId">[] }) => void;
   initial?: SchoolYear | null;
+}
+
+// ── Helper ───────────────────────────────────────────────────────────────────
+
+function formatDateInput(dateStr: string | undefined): string {
+  if (!dateStr) return "";
+  // Directly extract the YYYY-MM-DD portion to avoid timezone shifting when parsed
+  return dateStr.split("T")[0];
 }
 
 // ── Default quarter dates derived from SY start ───────────────────────────────
@@ -98,15 +106,38 @@ export default function SchoolYearForm({ open, onClose, onSave, initial }: Schoo
 
   const [form, setForm] = useState({
     label: initial?.label ?? "",
-    startDate: initial?.startDate ?? "",
-    endDate: initial?.endDate ?? "",
+    startDate: formatDateInput(initial?.startDate),
+    endDate: formatDateInput(initial?.endDate),
     isActive: initial?.isActive ?? false,
   });
 
   const [quarters, setQuarters] = useState<Omit<Quarter, "id" | "schoolYearId">[]>(
-    initial?.quarters.map(({ id, schoolYearId, ...rest }) => rest) ??
+    initial?.quarters?.map(({ id, schoolYearId, ...rest }) => ({
+      ...rest,
+      startDate: formatDateInput(rest.startDate),
+      endDate: formatDateInput(rest.endDate)
+    })) ??
     deriveQuarters("")
   );
+
+  useEffect(() => {
+    if (open) {
+      setForm({
+        label: initial?.label ?? "",
+        startDate: formatDateInput(initial?.startDate),
+        endDate: formatDateInput(initial?.endDate),
+        isActive: initial?.isActive ?? false,
+      });
+      setQuarters(
+        initial?.quarters?.map(({ id, schoolYearId, ...rest }) => ({
+          ...rest,
+          startDate: formatDateInput(rest.startDate),
+          endDate: formatDateInput(rest.endDate)
+        })) ??
+        deriveQuarters(formatDateInput(initial?.startDate))
+      );
+    }
+  }, [open, initial]);
 
   function handleStartDateChange(val: string) {
     setForm((p) => ({ ...p, startDate: val }));
@@ -114,10 +145,19 @@ export default function SchoolYearForm({ open, onClose, onSave, initial }: Schoo
   }
 
   function handleQuarterChange(index: number, field: string, value: string | boolean) {
-    setQuarters((prev) => prev.map((q, i) => i === index ? { ...q, [field]: value } : q));
+    if (field === "isActive" && value === true) {
+      setQuarters((prev) => prev.map((q, i) => ({ ...q, isActive: i === index })));
+    } else {
+      setQuarters((prev) => prev.map((q, i) => i === index ? { ...q, [field]: value } : q));
+    }
   }
 
   function handleSubmit() {
+    if (!form.label.trim()) return alert("School Year Label is required.");
+    if (!form.startDate) return alert("Start Date is required.");
+    if (!form.endDate) return alert("End Date is required.");
+    if (new Date(form.startDate) >= new Date(form.endDate)) return alert("End date must be after start date.");
+
     onSave({ ...form, quarters });
     onClose();
   }

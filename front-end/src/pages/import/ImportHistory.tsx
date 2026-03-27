@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronRight, Search, CheckCircle2, XCircle,
   AlertCircle, Clock, FileSpreadsheet, ExternalLink,
-  Download, RefreshCw, Filter,
+  Download, RefreshCw,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -13,12 +13,20 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import Sidebar from "@/components/sidebar";
-import {
-  MOCK_IMPORT_LOGS, STATUS_STYLES, QUARTER_LABELS,
-  GRADE_COLORS, formatDateTime, relativeTime,
-} from "../MockData";
+import { GRADE_COLORS, QUARTER_LABELS } from "@/utils/gradeUtils";
+import { formatDateTime, relativeTime } from "@/utils/dateUtils";
+import { getImportHistory, getImportDetails } from "@/services/api";
+import type { ImportLog } from "@/services/api";
 import { ROUTES } from "@/routes";
-import type { ImportLog } from "../types";
+
+// ── Import status helpers ──────────────────────────────────────────────────────
+
+const IMPORT_STATUS_STYLES = {
+  success:    { bg: "bg-emerald-100", text: "text-emerald-700", label: "Success"    },
+  partial:    { bg: "bg-amber-100",   text: "text-amber-700",   label: "Partial"    },
+  failed:     { bg: "bg-red-100",     text: "text-red-700",     label: "Failed"     },
+  processing: { bg: "bg-blue-100",    text: "text-blue-700",    label: "Processing" },
+} as const;
 
 // ── Status Icon ────────────────────────────────────────────────────────────────
 
@@ -36,18 +44,28 @@ function StatusIcon({ status, size = "md" }: { status: ImportLog["status"]; size
 
 export function ImportHistoryList() {
   const navigate = useNavigate();
-  const [search,        setSearch]        = useState("");
-  const [yearFilter,    setYearFilter]    = useState("all");
+  const [logs, setLogs]                 = useState<ImportLog[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [search, setSearch]             = useState("");
+  const [yearFilter, setYearFilter]     = useState("all");
   const [quarterFilter, setQuarterFilter] = useState("all");
   const [sectionFilter, setSectionFilter] = useState("all");
-  const [statusFilter,  setStatusFilter]  = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  const sections = Array.from(new Set(MOCK_IMPORT_LOGS.map((l) => l.section))).sort();
+  useEffect(() => {
+    getImportHistory()
+      .then(setLogs)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
-  const filtered = MOCK_IMPORT_LOGS.filter((log) => {
+  const sections = Array.from(new Set(logs.map((l) => l.section))).sort();
+  const schoolYears = Array.from(new Set(logs.map((l) => l.schoolYear))).sort().reverse();
+
+  const filtered = logs.filter((log) => {
     const matchSearch  = log.fileName.toLowerCase().includes(search.toLowerCase()) ||
                          log.section.toLowerCase().includes(search.toLowerCase()) ||
-                         log.importedBy.toLowerCase().includes(search.toLowerCase());
+                         (log.importedBy ?? "").toLowerCase().includes(search.toLowerCase());
     const matchYear    = yearFilter    === "all" || log.schoolYear === yearFilter;
     const matchQuarter = quarterFilter === "all" || String(log.quarter) === quarterFilter;
     const matchSection = sectionFilter === "all" || log.section === sectionFilter;
@@ -91,39 +109,53 @@ export function ImportHistoryList() {
                 className="pl-9 h-8 text-xs bg-white border-slate-200"
               />
             </div>
-            {[
-              {
-                value: yearFilter, onChange: setYearFilter, placeholder: "All Years",
-                options: [{ value: "2025-2026", label: "2025–2026" }, { value: "2024-2025", label: "2024–2025" }],
-              },
-              {
-                value: quarterFilter, onChange: setQuarterFilter, placeholder: "All Quarters",
-                options: [1,2,3,4].map((q) => ({ value: String(q), label: `Q${q}` })),
-              },
-              {
-                value: sectionFilter, onChange: setSectionFilter, placeholder: "All Sections",
-                options: sections.map((s) => ({ value: s, label: s })),
-              },
-              {
-                value: statusFilter, onChange: setStatusFilter, placeholder: "All Statuses",
-                options: ["success","partial","failed"].map((s) => ({ value: s, label: STATUS_STYLES[s as keyof typeof STATUS_STYLES].label })),
-              },
-            ].map((filter, i) => (
-              <Select key={i} value={filter.value} onValueChange={filter.onChange}>
-                <SelectTrigger className="h-8 w-32 text-xs border-slate-200 bg-white">
-                  <SelectValue placeholder={filter.placeholder} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{filter.placeholder}</SelectItem>
-                  {filter.options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            ))}
+            <Select value={yearFilter} onValueChange={setYearFilter}>
+              <SelectTrigger className="h-8 w-32 text-xs border-slate-200 bg-white">
+                <SelectValue placeholder="All Years" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Years</SelectItem>
+                {schoolYears.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={quarterFilter} onValueChange={setQuarterFilter}>
+              <SelectTrigger className="h-8 w-28 text-xs border-slate-200 bg-white">
+                <SelectValue placeholder="All Quarters" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Quarters</SelectItem>
+                {[1, 2, 3, 4].map((q) => <SelectItem key={q} value={String(q)}>Q{q}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={sectionFilter} onValueChange={setSectionFilter}>
+              <SelectTrigger className="h-8 w-32 text-xs border-slate-200 bg-white">
+                <SelectValue placeholder="All Sections" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sections</SelectItem>
+                {sections.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-8 w-28 text-xs border-slate-200 bg-white">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {(["success", "partial", "failed", "processing"] as const).map((s) => (
+                  <SelectItem key={s} value={s}>{IMPORT_STATUS_STYLES[s].label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Log table */}
           <Card className="border-0 shadow-sm overflow-hidden">
-            {filtered.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-20 text-slate-400">
+                <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center py-20 text-slate-400">
                 <FileSpreadsheet className="w-10 h-10 mb-3 opacity-30" />
                 <p className="text-sm font-semibold">No import logs found</p>
@@ -143,7 +175,7 @@ export function ImportHistoryList() {
                 </thead>
                 <tbody>
                   {filtered.map((log) => {
-                    const style = STATUS_STYLES[log.status];
+                    const style = IMPORT_STATUS_STYLES[log.status] ?? IMPORT_STATUS_STYLES.processing;
                     return (
                       <tr
                         key={log.id}
@@ -158,7 +190,7 @@ export function ImportHistoryList() {
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-1.5">
-                            <span className={`text-[10px] font-bold px-1 py-0.5 rounded ${GRADE_COLORS[log.gradeLevel]}`}>
+                            <span className={`text-[10px] font-bold px-1 py-0.5 rounded ${GRADE_COLORS[log.gradeLevel] ?? ""}`}>
                               G{log.gradeLevel}
                             </span>
                             <span className="text-xs text-slate-600">{log.section}</span>
@@ -170,7 +202,7 @@ export function ImportHistoryList() {
                         </td>
                         <td className="px-4 py-3.5">
                           <p className="text-xs font-semibold text-slate-700">{log.rowsEncoded}/{log.rowsTotal}</p>
-                          {log.rowsSkipped > 0 && (
+                          {(log.rowsSkipped ?? 0) > 0 && (
                             <p className="text-[10px] text-red-500">{log.rowsSkipped} skipped</p>
                           )}
                         </td>
@@ -206,7 +238,24 @@ export function ImportHistoryList() {
 export function ImportLogDetail() {
   const navigate = useNavigate();
   const { logId } = useParams<{ logId: string }>();
-  const log = MOCK_IMPORT_LOGS.find((l) => l.id === Number(logId));
+  const [log, setLog]       = useState<ImportLog | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!logId) return;
+    getImportDetails(Number(logId))
+      .then(setLog)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [logId]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-slate-50 items-center justify-center">
+        <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!log) {
     return (
@@ -225,9 +274,7 @@ export function ImportLogDetail() {
     );
   }
 
-  const style = STATUS_STYLES[log.status];
-  const errorRows    = log.errors.filter((e) => e.severity === "error");
-  const warningRows  = log.errors.filter((e) => e.severity === "warning");
+  const style = IMPORT_STATUS_STYLES[log.status] ?? IMPORT_STATUS_STYLES.processing;
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -277,14 +324,16 @@ export function ImportLogDetail() {
                 {" · "}{formatDateTime(log.importedAt)}
               </p>
             </div>
-            <a
-              href={log.fileUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 text-xs text-teal-500 hover:underline flex-shrink-0 mt-1"
-            >
-              <ExternalLink className="w-3.5 h-3.5" /> Open in Drive
-            </a>
+            {log.fileUrl && (
+              <a
+                href={log.fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 text-xs text-teal-500 hover:underline flex-shrink-0 mt-1"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Open in Drive
+              </a>
+            )}
           </div>
 
           {/* ── Details Grid ── */}
@@ -307,13 +356,13 @@ export function ImportLogDetail() {
           {/* ── Row counts ── */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: "Total Rows",   value: log.rowsTotal,   color: "text-slate-800",   bg: "bg-white" },
-              { label: "Rows Encoded", value: log.rowsEncoded, color: "text-emerald-700", bg: "bg-emerald-50" },
-              { label: "Rows Skipped", value: log.rowsSkipped, color: "text-red-600",     bg: "bg-red-50" },
+              { label: "Total Rows",   value: log.rowsTotal,   color: "text-slate-800",   bg: "bg-white"        },
+              { label: "Rows Encoded", value: log.rowsEncoded, color: "text-emerald-700", bg: "bg-emerald-50"  },
+              { label: "Rows Skipped", value: log.rowsSkipped, color: "text-red-600",     bg: "bg-red-50"      },
             ].map(({ label, value, color, bg }) => (
               <Card key={label} className={`border-0 shadow-sm ${bg}`}>
                 <CardContent className="px-5 py-4 text-center">
-                  <p className={`text-3xl font-black ${color}`}>{value}</p>
+                  <p className={`text-3xl font-black ${color}`}>{value ?? 0}</p>
                   <p className="text-xs text-slate-500 mt-0.5">{label}</p>
                 </CardContent>
               </Card>
@@ -321,7 +370,7 @@ export function ImportLogDetail() {
           </div>
 
           {/* ── Errors ── */}
-          {log.errors.length > 0 ? (
+          {(log.errors?.length ?? 0) > 0 ? (
             <div className="space-y-3">
               <p className="text-sm font-black text-slate-700">
                 Issues Encountered
@@ -341,7 +390,7 @@ export function ImportLogDetail() {
                     </tr>
                   </thead>
                   <tbody>
-                    {log.errors.map((err, i) => (
+                    {log.errors.map((err: any, i: number) => (
                       <tr key={i} className={`border-b border-slate-100 last:border-0 ${err.severity === "error" ? "bg-red-50/30" : "bg-amber-50/30"}`}>
                         <td className="px-5 py-3">
                           {err.severity === "error"

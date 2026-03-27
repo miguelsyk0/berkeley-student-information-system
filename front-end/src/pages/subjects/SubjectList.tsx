@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus, ChevronRight, Pencil, Trash2,
   Search, BookMarked, MoreHorizontal,
-  ArrowUp, ArrowDown, Tag, CheckCircle2,
+  ArrowUp, ArrowDown,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,27 +20,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import Sidebar from "@/components/sidebar";
-import type { Subject } from "../types";
 import { ROUTES } from "@/routes";
+import { getSubjects } from "@/services/api";
+import type { Subject } from "../types";
 
-// ── Mock Data ──────────────────────────────────────────────────────────────────
-
-const MOCK_SUBJECTS: Subject[] = [
-  { id: 1,  code: "LA",   name: "Logical Analysis",     displayName: "Filipino",            isMapeh: false, order: 1,  isActive: true  },
-  { id: 2,  code: "SCI",  name: "Science Lab",           displayName: "Science",             isMapeh: false, order: 2,  isActive: true  },
-  { id: 3,  code: "MATH", name: "Math Lab",              displayName: "Mathematics",         isMapeh: false, order: 3,  isActive: true  },
-  { id: 4,  code: "SL",   name: "Social Literacy",       displayName: "Araling Panlipunan",  isMapeh: false, order: 4,  isActive: true  },
-  { id: 5,  code: "EL",   name: "English Lab",           displayName: "English",             isMapeh: false, order: 5,  isActive: true  },
-  { id: 6,  code: "WP",   name: "Wika at Pagpapakatao",  displayName: "ESP",                 isMapeh: false, order: 6,  isActive: true  },
-  { id: 7,  code: "MAP",  name: "Psychomotor",           displayName: "MAPEH",               isMapeh: false, order: 7,  isActive: true  },
-  { id: 8,  code: "MUS",  name: "Music",                 displayName: "Music",               isMapeh: true,  mapehParentId: 7, order: 8,  isActive: true  },
-  { id: 9,  code: "ART",  name: "Arts",                  displayName: "Arts",                isMapeh: true,  mapehParentId: 7, order: 9,  isActive: true  },
-  { id: 10, code: "PE",   name: "Physical Education",    displayName: "PE",                  isMapeh: true,  mapehParentId: 7, order: 10, isActive: true  },
-  { id: 11, code: "HLT",  name: "Health",                displayName: "Health",              isMapeh: true,  mapehParentId: 7, order: 11, isActive: true  },
-  { id: 12, code: "TLE",  name: "TLE",                   displayName: "TLE",                 isMapeh: false, order: 12, isActive: true  },
-  { id: 13, code: "MSE",  name: "MSE",                   displayName: "MSE",                 isMapeh: false, order: 13, isActive: true  },
-  { id: 14, code: "COD",  name: "Coding",                displayName: "Computer Science",    isMapeh: false, order: 14, isActive: true  },
-];
 
 // ── Subject Row ────────────────────────────────────────────────────────────────
 
@@ -181,9 +164,13 @@ function SubjectRow({
 
 export default function SubjectList() {
   const navigate = useNavigate();
-  const [subjects, setSubjects] = useState(MOCK_SUBJECTS);
+  const [subjects, setSubjects] = useState<any[]>([]); // Using any since Subject might not exist locally
   const [search, setSearch] = useState("");
   const [filterMapeh, setFilterMapeh] = useState<"all" | "mapeh" | "regular">("all");
+
+  useEffect(() => {
+    getSubjects().then(setSubjects).catch(console.error);
+  }, []);
 
   const filtered = subjects
     .filter((s) => {
@@ -202,8 +189,10 @@ export default function SubjectList() {
     setSubjects((prev) => prev.filter((s) => s.id !== id));
   }
 
-  function handleToggleActive(id: number) {
+  async function handleToggleActive(id: number) {
+    // Optimistic toggle
     setSubjects((prev) => prev.map((s) => s.id === id ? { ...s, isActive: !s.isActive } : s));
+    // Provide actual API call here in production
   }
 
   function handleMoveUp(id: number) {

@@ -11,13 +11,13 @@ import {
   FileDown,
   Settings,
   LogOut,
-  Menu,
   X,
   ChevronDown,
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -30,7 +30,6 @@ export interface NavItem {
   icon: LucideIcon;
   label: string;
   href: string;
-  /** Optional sub-links rendered when this group is expanded */
   children?: NavChild[];
 }
 
@@ -41,9 +40,8 @@ export interface SidebarUser {
 }
 
 export interface SidebarProps {
-  user: SidebarUser;
+  user?: SidebarUser;
   onLogout?: () => void;
-  /** Controlled open state. Omit to let the sidebar manage its own state. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
@@ -109,15 +107,30 @@ export const NAV_ITEMS: NavItem[] = [
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function Sidebar({ user, onLogout, open: controlledOpen, onOpenChange }: SidebarProps) {
+export default function Sidebar({ user: propUser, onLogout: propOnLogout, open: controlledOpen, onOpenChange }: SidebarProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { user: firebaseUser, logout } = useAuth();
+
+  // Derive display info from Firebase user, fallback to props
+  const displayName = firebaseUser?.displayName || firebaseUser?.email?.split("@")[0] || propUser?.name || "User";
+  const displayRole = propUser?.role || "Registrar";
+  const displayInitials = propUser?.initials || displayName.slice(0, 2).toUpperCase();
+
+  async function handleLogout() {
+    try {
+      await logout();
+      navigate("/login");
+    } catch (err) {
+      console.error("Logout failed", err);
+    }
+    propOnLogout?.();
+  }
 
   // Sidebar open/collapsed state
   const [internalOpen, setInternalOpen] = useState(true);
   const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
 
-  // Which parent nav items have their children expanded
   const [expandedItems, setExpandedItems] = useState<string[]>(() =>
     NAV_ITEMS
       .filter((item) =>
@@ -135,13 +148,11 @@ export default function Sidebar({ user, onLogout, open: controlledOpen, onOpenCh
 
   function handleParentClick(item: NavItem) {
     if (item.children?.length) {
-      // Toggle submenu
       setExpandedItems((prev) =>
         prev.includes(item.href)
           ? prev.filter((h) => h !== item.href)
           : [...prev, item.href]
       );
-      // Navigate to first child if we're not already in this section
       if (!pathname.startsWith(item.href)) {
         navigate(item.children[0].href);
       }
@@ -199,7 +210,6 @@ export default function Sidebar({ user, onLogout, open: controlledOpen, onOpenCh
 
           return (
             <div key={item.href}>
-              {/* Parent button */}
               <button
                 onClick={() => handleParentClick(item)}
                 title={!isOpen ? item.label : undefined}
@@ -226,7 +236,6 @@ export default function Sidebar({ user, onLogout, open: controlledOpen, onOpenCh
                 )}
               </button>
 
-              {/* Children (only when sidebar is open and group is expanded) */}
               {isOpen && hasChildren && isExpanded && (
                 <div className="ml-7 mt-0.5 mb-1 pl-3 border-l-2 border-slate-100 space-y-0.5">
                   {item.children!.map((child) => (
@@ -276,18 +285,18 @@ export default function Sidebar({ user, onLogout, open: controlledOpen, onOpenCh
         <div className="flex items-center gap-2.5">
           <Avatar className="w-8 h-8 flex-shrink-0">
             <AvatarFallback className="bg-teal-100 text-teal-800 text-xs font-bold">
-              {user.initials}
+              {displayInitials}
             </AvatarFallback>
           </Avatar>
 
           {isOpen && (
             <>
               <div className="flex-1 overflow-hidden">
-                <p className="text-xs font-semibold text-slate-700 truncate">{user.name}</p>
-                <p className="text-[10px] text-slate-400">{user.role}</p>
+                <p className="text-xs font-semibold text-slate-700 truncate">{displayName}</p>
+                <p className="text-[10px] text-slate-400">{displayRole}</p>
               </div>
               <button
-                onClick={onLogout}
+                onClick={handleLogout}
                 title="Log out"
                 className="text-slate-400 hover:text-red-500 transition-colors"
               >

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ChevronRight, Search, ClipboardList, TrendingUp, CheckCircle2, AlertCircle,
+  ChevronRight, Search, ClipboardList, TrendingUp, CheckCircle2,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,27 +9,60 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Sidebar from "@/components/sidebar";
 import {
-  SUBJECTS, MOCK_STUDENTS, QUARTERLY_MOCK, GRADE_COLORS,
-  computeAvg, gradeColor, letterGrade,
-} from "./MockData";
+  GRADE_COLORS, gradeColor, letterGrade,
+} from "@/utils/gradeUtils";
 import { ROUTES } from "@/routes";
+import { getStudents, getStudentGrades, getSubjects } from "@/services/api";
+import type { Student, Subject } from "@/services/api";
 
 export default function StudentGradeView() {
   const navigate = useNavigate();
-  const { studentId } = useParams<{ studentId: string }>();
-
-  const initialStudent =
-    MOCK_STUDENTS.find((s) => s.studentId === Number(studentId)) ?? MOCK_STUDENTS[0];
+  const { studentId: paramId } = useParams<{ studentId: string }>();
 
   const [tab,             setTab]             = useState<"quarterly" | "final">("quarterly");
-  const [selectedStudent, setSelectedStudent] = useState(initialStudent);
+  const [students,        setStudents]        = useState<Student[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [subjects,        setSubjects]        = useState<Subject[]>([]);
+  const [grades,          setGrades]          = useState<any[]>([]);
   const [search,          setSearch]          = useState("");
 
-  const filtered = MOCK_STUDENTS.filter(
+  useEffect(() => {
+    async function init() {
+      try {
+        const [stus, subjs] = await Promise.all([getStudents(), getSubjects()]);
+        setStudents(stus);
+        setSubjects(subjs);
+        if (paramId) {
+          const found = stus.find(s => String(s.id) === paramId);
+          if (found) setSelectedStudent(found);
+        } else if (stus.length > 0) {
+          setSelectedStudent(stus[0]);
+        }
+      } catch (err) {
+        console.error("Init failed", err);
+      }
+    }
+    init();
+  }, [paramId]);
+
+  useEffect(() => {
+    if (!selectedStudent) return;
+    getStudentGrades(selectedStudent.id).then(setGrades).catch(console.error);
+  }, [selectedStudent]);
+
+  const filtered = students.filter(
     (s) =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
       s.lrn.includes(search)
   );
+
+  const computeGenAvg = () => {
+    const valid = grades.filter(g => g.finalGrade != null);
+    if (valid.length === 0) return null;
+    return valid.reduce((sum, g) => sum + g.finalGrade, 0) / valid.length;
+  };
+
+  const genAvg = computeGenAvg();
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -77,22 +110,22 @@ export default function StudentGradeView() {
 
             <div className="overflow-y-auto flex-1 py-1">
               {filtered.map((s) => {
-                const active = selectedStudent.studentId === s.studentId;
+                const active = selectedStudent?.id === s.id;
+                const fullName = `${s.lastName}, ${s.firstName}`;
                 return (
                   <button
-                    key={s.studentId}
+                    key={s.id}
                     onClick={() => setSelectedStudent(s)}
                     className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 hover:bg-slate-50 transition-colors ${active ? "bg-teal-50" : ""}`}
                   >
                     <Avatar className="w-7 h-7 flex-shrink-0">
                       <AvatarFallback className={`text-[10px] font-bold ${active ? "bg-teal-200 text-teal-800" : "bg-slate-100 text-slate-600"}`}>
-                        {s.name.split(",")[0]?.[0]}
-                        {s.name.split(" ").slice(-1)[0]?.[0]}
+                        {s.lastName[0]}{s.firstName[0]}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
                       <p className={`text-xs font-semibold truncate ${active ? "text-teal-800" : "text-slate-700"}`}>
-                        {s.name}
+                        {fullName}
                       </p>
                       <p className="text-[10px] text-slate-400 font-mono">{s.lrn}</p>
                     </div>
@@ -109,13 +142,14 @@ export default function StudentGradeView() {
               <div className="p-4 flex items-center gap-4">
                 <Avatar className="w-12 h-12">
                   <AvatarFallback className="bg-teal-100 text-teal-800 text-sm font-black">
-                    {selectedStudent.name.split(",")[0]?.[0]}
-                    {selectedStudent.name.split(" ").slice(-1)[0]?.[0]}
+                    {selectedStudent?.lastName[0]}{selectedStudent?.firstName[0]}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h2 className="text-lg font-black text-slate-800">{selectedStudent.name}</h2>
-                  <p className="text-xs font-mono text-slate-400">LRN: {selectedStudent.lrn}</p>
+                  <h2 className="text-lg font-black text-slate-800">
+                    {selectedStudent ? `${selectedStudent.lastName}, ${selectedStudent.firstName}` : "---"}
+                  </h2>
+                  <p className="text-xs font-mono text-slate-400">LRN: {selectedStudent?.lrn}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${GRADE_COLORS[8]}`}>
                       Grade 8
@@ -125,8 +159,8 @@ export default function StudentGradeView() {
                 </div>
                 <div className="ml-auto text-right">
                   <p className="text-[10px] text-slate-400 uppercase tracking-widest">General Average</p>
-                  <p className={`text-2xl font-black ${gradeColor(computeAvg(selectedStudent.grades))}`}>
-                    {computeAvg(selectedStudent.grades)?.toFixed(2) ?? "—"}
+                  <p className={`text-2xl font-black ${gradeColor(genAvg)}`}>
+                    {genAvg?.toFixed(2) ?? "—"}
                   </p>
                 </div>
               </div>
@@ -170,24 +204,27 @@ export default function StudentGradeView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {SUBJECTS.map((subj) => (
-                      <tr key={subj.code} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                        <td className="px-5 py-3">
-                          <p className="text-xs font-semibold text-slate-700">{subj.name}</p>
-                          <p className="text-[10px] text-slate-400">{subj.code}</p>
-                        </td>
-                        {[1, 2, 3, 4].map((q) => {
-                          const v = QUARTERLY_MOCK[subj.code]?.[q];
-                          return (
-                            <td key={q} className="px-4 py-3 text-center">
-                              <span className={`text-sm ${gradeColor(v)}`}>
-                                {v ?? <span className="text-slate-300 text-xs">—</span>}
-                              </span>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                    {subjects.map((subj) => {
+                      const g = grades.find(x => x.subjectName === subj.name);
+                      return (
+                        <tr key={subj.code} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                          <td className="px-5 py-3">
+                            <p className="text-xs font-semibold text-slate-700">{subj.name}</p>
+                            <p className="text-[10px] text-slate-400">{subj.code}</p>
+                          </td>
+                          {[1, 2, 3, 4].map((q) => {
+                            const v = g ? g[`q${q}Grade`] : null;
+                            return (
+                              <td key={q} className="px-4 py-3 text-center">
+                                <span className={`text-sm ${gradeColor(v)}`}>
+                                  {v ?? <span className="text-slate-300 text-xs">—</span>}
+                                </span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </Card>
@@ -206,13 +243,10 @@ export default function StudentGradeView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {SUBJECTS.map((subj) => {
-                      const qs      = [1, 2, 3, 4].map((q) => QUARTERLY_MOCK[subj.code]?.[q] ?? null);
-                      const validQs = qs.filter((v): v is number => v !== null);
-                      const final   = validQs.length === 4
-                        ? Math.round(validQs.reduce((a, b) => a + b) / 4 * 100) / 100
-                        : null;
-                      const passed  = final !== null && final >= 75;
+                    {subjects.map((subj) => {
+                      const g = grades.find(x => x.subjectName === subj.name);
+                      const final = g?.finalGrade ?? null;
+                      const passed = final !== null && final >= 75;
 
                       return (
                         <tr key={subj.code} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
@@ -220,11 +254,14 @@ export default function StudentGradeView() {
                             <p className="text-xs font-semibold text-slate-700">{subj.name}</p>
                             <p className="text-[10px] text-slate-400">{subj.code}</p>
                           </td>
-                          {qs.map((q, i) => (
-                            <td key={i} className="px-4 py-3 text-center">
-                              <span className={`text-xs ${gradeColor(q)}`}>{q ?? "—"}</span>
-                            </td>
-                          ))}
+                          {[1, 2, 3, 4].map((q, i) => {
+                            const val = g ? g[`q${q}Grade`] : null;
+                            return (
+                              <td key={i} className="px-4 py-3 text-center">
+                                <span className={`text-xs ${gradeColor(val)}`}>{val ?? "—"}</span>
+                              </td>
+                            );
+                          })}
                           <td className="px-4 py-3 text-center">
                             <span className={`text-sm font-bold ${gradeColor(final)}`}>
                               {final?.toFixed(2) ?? "—"}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ChevronRight, Upload, Link2, FileSpreadsheet,
+  ChevronRight, Link2, FileSpreadsheet,
   CheckCircle2, XCircle, AlertCircle, ArrowRight,
   X, RefreshCw, Table2, Wand2, Save,
 } from "lucide-react";

@@ -5,8 +5,8 @@ const router = express.Router();
 
 // ── School Profile ────────────────────────────────────────
 
-// GET /api/school
-router.get("/", async (req, res) => {
+// GET /api/school/profile
+router.get("/school/profile", async (req, res) => {
   try {
     const school = await db.oneOrNone("SELECT * FROM get_school_profile()");
     res.json(school || {});
@@ -16,14 +16,13 @@ router.get("/", async (req, res) => {
   }
 });
 
-// PUT /api/school
-router.put("/", async (req, res) => {
+// PUT /api/school/profile
+router.put("/school/profile", async (req, res) => {
   try {
-    const { name, depedId, district, division, region, address, contactNumber, email, principalName } = req.body;
+    const { name, depedId, district, division, region, address } = req.body;
     const result = await db.one(
-      "SELECT * FROM upsert_school_profile($1,$2,$3,$4,$5,$6,$7,$8,$9)",
-      [name, depedId || null, district || null, division || null, region || null,
-       address || null, contactNumber || null, email || null, principalName || null]
+      "SELECT * FROM update_school_profile($1,$2,$3,$4,$5,$6)",
+      [name, depedId || null, district || null, division || null, region || null, address || null]
     );
     res.json(result);
   } catch (err) {
@@ -38,7 +37,14 @@ router.put("/", async (req, res) => {
 router.get("/years", async (req, res) => {
   try {
     const years = await db.any("SELECT * FROM get_school_years()");
-    res.json(years);
+    res.json(years.map(y => ({
+      id: y.id,
+      label: y.label,
+      startDate: y.startDate || y.start_date,
+      endDate: y.endDate || y.end_date,
+      isActive: y.isActive !== undefined ? y.isActive : y.is_active,
+      quarters: y.quarters || y.quarters_json || []
+    })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "server error" });
@@ -68,7 +74,14 @@ router.post("/years", async (req, res) => {
       "SELECT * FROM create_school_year($1,$2,$3,$4,$5)",
       [label, startDate, endDate, isActive || false, JSON.stringify(quarters || [])]
     );
-    res.status(201).json(result);
+    res.status(201).json({
+      id: result.id,
+      label: result.label || label,
+      startDate: startDate,
+      endDate: endDate,
+      isActive: isActive || false,
+      quarters: quarters || []
+    });
   } catch (err) {
     console.error(err);
     if (err.code === "23505") return res.status(409).json({ error: "School year label already exists" });
@@ -85,7 +98,14 @@ router.put("/years/:id", async (req, res) => {
       [req.params.id, label, startDate, endDate, isActive || false, JSON.stringify(quarters || [])]
     );
     if (!result) return res.status(404).json({ error: "School year not found" });
-    res.json(result);
+    res.json({
+      id: result.id,
+      label: result.label || label,
+      startDate: startDate,
+      endDate: endDate,
+      isActive: isActive || false,
+      quarters: quarters || []
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "server error" });
@@ -95,8 +115,8 @@ router.put("/years/:id", async (req, res) => {
 // DELETE /api/school/years/:id
 router.delete("/years/:id", async (req, res) => {
   try {
-    await db.none("SELECT delete_school_year($1)", [req.params.id]);
-    res.status(204).send();
+    await db.any("SELECT delete_school_year($1)", [req.params.id]);
+    res.json({ result: "deleted" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "server error" });
@@ -110,11 +130,28 @@ router.delete("/years/:id", async (req, res) => {
 router.get("/sections", async (req, res) => {
   try {
     const { schoolYearId, gradeLevel } = req.query;
-    const sections = await db.any(
-      "SELECT * FROM get_sections($1,$2)",
-      [schoolYearId || null, gradeLevel || null]
-    );
-    res.json(sections);
+    let sections;
+    if (schoolYearId || gradeLevel) {
+      sections = await db.any(
+        "SELECT * FROM get_sections($1,$2)",
+        [schoolYearId || null, gradeLevel || null]
+      );
+    } else {
+      sections = await db.any("SELECT * FROM get_sections()");
+    }
+    res.json(sections.map(s => ({
+      id: s.id,
+      name: s.name,
+      gradeLevel: s.grade_level,
+      schoolYearId: s.school_year_id,
+      schoolYear: s.school_year || null,
+      adviserId: s.adviser_id,
+      adviserName: s.adviser_name || null,
+      studentCount: s.student_count || 0,
+      roomNumber: s.room_number || null,
+      capacity: s.capacity || 0,
+      enrolledCount: s.enrolled_count || s.student_count || 0
+    })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "server error" });
@@ -156,10 +193,22 @@ router.post("/sections", async (req, res) => {
   try {
     const { schoolYearId, gradeLevel, name, adviserId, roomNumber } = req.body;
     const result = await db.one(
-      "SELECT * FROM create_section($1,$2,$3,$4,$5)",
+      "SELECT * FROM create_section($1::integer, $2::smallint, $3::varchar, $4::integer, $5::varchar)",
       [schoolYearId, gradeLevel, name, adviserId || null, roomNumber || null]
     );
-    res.status(201).json(result);
+    res.status(201).json({
+      id: result.id,
+      name: result.name || name,
+      gradeLevel: Number(gradeLevel),
+      schoolYearId: Number(schoolYearId),
+      schoolYear: req.body.schoolYear || null,
+      adviserId: adviserId || null,
+      adviserName: null,
+      studentCount: 0,
+      roomNumber: roomNumber || null,
+      capacity: 0,
+      enrolledCount: 0
+    });
   } catch (err) {
     console.error(err);
     if (err.code === "23505") return res.status(409).json({ error: "Section already exists for this school year and grade" });
@@ -170,11 +219,15 @@ router.post("/sections", async (req, res) => {
 // PUT /api/school/sections/:id
 router.put("/sections/:id", async (req, res) => {
   try {
-    const { name, adviserId, roomNumber } = req.body;
+    const { name, gradeLevel, schoolYearId, adviserId, roomNumber } = req.body;
     const result = await db.oneOrNone(
-      "SELECT * FROM update_section($1,$2,$3,$4)",
-      [req.params.id, name, adviserId || null, roomNumber || null]
+      "UPDATE sections SET name = COALESCE($2, name), grade_level = COALESCE($3, grade_level), school_year_id = COALESCE($4, school_year_id), room_number = COALESCE($5, room_number) WHERE id = $1 RETURNING *",
+      [req.params.id, name || null, gradeLevel || null, schoolYearId || null, roomNumber || null]
     );
+    
+    if (adviserId !== undefined && result) {
+      await db.none("SELECT assign_section_adviser($1, $2)", [req.params.id, adviserId || null]);
+    }
     if (!result) return res.status(404).json({ error: "Section not found" });
     res.json(result);
   } catch (err) {
@@ -186,8 +239,8 @@ router.put("/sections/:id", async (req, res) => {
 // DELETE /api/school/sections/:id
 router.delete("/sections/:id", async (req, res) => {
   try {
-    await db.none("SELECT delete_section($1)", [req.params.id]);
-    res.status(204).send();
+    await db.any("SELECT delete_section($1)", [req.params.id]);
+    res.json({ result: "deleted" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "server error" });
@@ -202,7 +255,7 @@ router.put("/sections/:id/adviser", async (req, res) => {
   try {
     const { adviserId } = req.body;
     const result = await db.one(
-      "SELECT * FROM assign_adviser($1,$2)",
+      "SELECT * FROM assign_section_adviser($1,$2)",
       [req.params.id, adviserId || null]
     );
     res.json(result);

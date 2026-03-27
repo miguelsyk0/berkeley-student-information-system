@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BookOpen, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,8 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import type { Section } from "../types";
+import type { Section, SchoolYear, Teacher } from "@/services/api";
+import { getSchoolYears, getTeachers } from "@/services/api";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -20,21 +21,6 @@ interface SectionFormProps {
   initial?: Section | null;
 }
 
-// ── Mock school years & advisers for dropdowns ─────────────────────────────────
-
-const SCHOOL_YEARS = [
-  { id: 1, label: "2025-2026" },
-  { id: 2, label: "2024-2025" },
-];
-
-const ADVISERS = [
-  { id: 1, name: "Ms. A. Reyes" },
-  { id: 2, name: "Mr. B. Santos" },
-  { id: 3, name: "Ms. C. Cruz" },
-  { id: 4, name: "Mr. D. Lim" },
-  { id: 5, name: "Ms. E. Garcia" },
-  { id: 6, name: "Mr. F. Torres" },
-];
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -44,13 +30,43 @@ export default function SectionForm({ open, onClose, onSave, initial }: SectionF
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     gradeLevel: String(initial?.gradeLevel ?? "7") as "7" | "8" | "9" | "10",
-    schoolYearId: String(initial?.schoolYearId ?? "1"),
-    schoolYear: initial?.schoolYear ?? "2025-2026",
+    schoolYearId: initial?.schoolYearId ? String(initial.schoolYearId) : "",
+    schoolYear: initial?.schoolYear ?? "",
     adviserId: initial?.adviserId ? String(initial.adviserId) : "",
     roomNumber: initial?.roomNumber ?? "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      getSchoolYears().then((yrs) => {
+        setSchoolYears(yrs);
+        // Set default to first school year if adding new section
+        if (!initial && yrs.length > 0) {
+          setForm((p) => ({
+            ...p,
+            schoolYearId: String(yrs[0].id),
+            schoolYear: yrs[0].label,
+          }));
+        }
+      }).catch(console.error);
+      getTeachers().then(setTeachers).catch(console.error);
+
+      // Reset form when dialog opens
+      setForm({
+        name: initial?.name ?? "",
+        gradeLevel: String(initial?.gradeLevel ?? "7") as "7" | "8" | "9" | "10",
+        schoolYearId: initial?.schoolYearId ? String(initial.schoolYearId) : "",
+        schoolYear: initial?.schoolYear ?? "",
+        adviserId: initial?.adviserId ? String(initial.adviserId) : "",
+        roomNumber: initial?.roomNumber ?? "",
+      });
+    }
+  }, [open, initial]);
 
   function validate() {
     const e: Record<string, string> = {};
@@ -62,15 +78,15 @@ export default function SectionForm({ open, onClose, onSave, initial }: SectionF
   function handleSubmit() {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
-    const selectedSY = SCHOOL_YEARS.find((sy) => String(sy.id) === form.schoolYearId);
+    const selectedSY = schoolYears.find((sy) => String(sy.id) === form.schoolYearId);
     onSave({
       name: form.name.trim(),
-      gradeLevel: Number(form.gradeLevel) as 7 | 8 | 9 | 10,
+      gradeLevel: Number(form.gradeLevel),
       schoolYearId: Number(form.schoolYearId),
       schoolYear: selectedSY?.label ?? "",
       adviserId: form.adviserId && form.adviserId !== "none" ? Number(form.adviserId) : null,
       roomNumber: form.roomNumber || undefined,
-    });
+    } as Omit<Section, "id" | "studentCount" | "adviserName">);
     onClose();
   }
 
@@ -124,7 +140,7 @@ export default function SectionForm({ open, onClose, onSave, initial }: SectionF
               <Select
                 value={form.schoolYearId}
                 onValueChange={(v) => {
-                  const sy = SCHOOL_YEARS.find((s) => String(s.id) === v);
+                  const sy = schoolYears.find((s) => String(s.id) === v);
                   setForm((p) => ({ ...p, schoolYearId: v, schoolYear: sy?.label ?? "" }));
                   setErrors((p) => ({ ...p, schoolYearId: "" }));
                 }}
@@ -133,7 +149,7 @@ export default function SectionForm({ open, onClose, onSave, initial }: SectionF
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SCHOOL_YEARS.map((sy) => (
+                  {schoolYears.map((sy) => (
                     <SelectItem key={sy.id} value={String(sy.id)}>{sy.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -153,7 +169,7 @@ export default function SectionForm({ open, onClose, onSave, initial }: SectionF
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No adviser yet</SelectItem>
-                {ADVISERS.map((a) => (
+                {teachers.map((a) => (
                   <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
                 ))}
               </SelectContent>

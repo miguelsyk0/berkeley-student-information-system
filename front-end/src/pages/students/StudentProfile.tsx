@@ -1,21 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronRight, Pencil, GraduationCap, User,
-  BookOpen, Clock, Award, CalendarDays,
-  UserCheck, TrendingUp, CheckCircle2, AlertCircle,
+  BookOpen, Clock, Award,
+  TrendingUp, CheckCircle2, AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
 import Sidebar from "@/components/sidebar";
 import {
-  MOCK_STUDENTS, MOCK_ENROLLMENTS, MOCK_ACADEMIC_RECORDS,
-  GRADE_COLORS, STATUS_STYLES, getAge, formatDate,
-} from "./mockData";
+  GRADE_COLORS, STATUS_STYLES,
+} from "@/utils/gradeUtils";
+import { getAge, formatDate } from "@/utils/dateUtils";
+import { getStudentDetails, getStudentEnrollments, getStudentAcademicRecords } from "@/services/api";
 import { ROUTES } from "@/routes";
+import type { Student, Enrollment, AcademicRecord } from "@/services/api";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
 
 // ── Tab: Personal Information ──────────────────────────────────────────────────
 
-function PersonalInfoTab({ student }: { student: typeof MOCK_STUDENTS[0] }) {
+function PersonalInfoTab({ student }: { student: Student }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <Card className="border-0 shadow-sm">
@@ -66,8 +67,8 @@ function PersonalInfoTab({ student }: { student: typeof MOCK_STUDENTS[0] }) {
 
 // ── Tab: JHS Eligibility ───────────────────────────────────────────────────────
 
-function EligibilityTab({ student }: { student: typeof MOCK_STUDENTS[0] }) {
-  const hasCredential = !!student.otherCredential;
+function EligibilityTab({ student }: { student: Student }) {
+  const hasCredential = !!student.elementarySchoolId || !!student.elementarySchoolName; // updated heuristic
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -116,11 +117,7 @@ function EligibilityTab({ student }: { student: typeof MOCK_STUDENTS[0] }) {
 
 // ── Tab: Enrollment History ────────────────────────────────────────────────────
 
-function EnrollmentHistoryTab({ studentId }: { studentId: number }) {
-  const enrollments = MOCK_ENROLLMENTS
-    .filter((e) => e.studentId === studentId)
-    .sort((a, b) => b.schoolYear.localeCompare(a.schoolYear));
-
+function EnrollmentHistoryTab({ enrollments }: { studentId?: number; enrollments: Enrollment[] }) {
   if (enrollments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
@@ -174,13 +171,8 @@ function EnrollmentHistoryTab({ studentId }: { studentId: number }) {
 
 // ── Tab: Academic Record ───────────────────────────────────────────────────────
 
-function AcademicRecordTab({ studentId }: { studentId: number }) {
-  const records = MOCK_ACADEMIC_RECORDS.filter((r) => {
-    const enrollment = MOCK_ENROLLMENTS.find((e) => e.id === r.enrollmentId);
-    return enrollment?.studentId === studentId;
-  });
-
-  const [selectedRecord, setSelectedRecord] = useState(records[0] ?? null);
+function AcademicRecordTab({ records }: { studentId?: number; records: AcademicRecord[] }) {
+  const [selectedRecord, setSelectedRecord] = useState<AcademicRecord | null>(records[0] ?? null);
 
   if (records.length === 0) {
     return (
@@ -263,38 +255,35 @@ function AcademicRecordTab({ studentId }: { studentId: number }) {
               </tr>
             </thead>
             <tbody>
-              {selectedRecord.grades.map((g) => (
-                <tr key={g.subjectCode} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+              {selectedRecord.subjectName ? (
+                <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                   <td className="px-5 py-3">
-                    <p className="text-xs font-semibold text-slate-700">{g.subjectName}</p>
-                    <p className="text-[10px] text-slate-400">{g.subjectCode}</p>
+                    <p className="text-xs font-semibold text-slate-700">{selectedRecord.subjectName}</p>
                   </td>
-                  {[g.q1, g.q2, g.q3, g.q4].map((q, i) => (
+                  {[selectedRecord.q1Grade, selectedRecord.q2Grade, selectedRecord.q3Grade, selectedRecord.q4Grade].map((q, i) => (
                     <td key={i} className={`px-4 py-3 text-center text-xs ${gradeColor(q)}`}>
                       {q ?? "—"}
                     </td>
                   ))}
-                  <td className={`px-4 py-3 text-center text-sm ${gradeColor(g.final)}`}>
-                    {g.final?.toFixed(2) ?? "—"}
+                  <td className={`px-4 py-3 text-center text-sm ${gradeColor(selectedRecord.finalGrade)}`}>
+                    {selectedRecord.finalGrade?.toFixed(2) ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    {g.letterGrade ? (
-                      <span className="text-xs font-bold text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded">
-                        {g.letterGrade}
-                      </span>
-                    ) : "—"}
+                    —
                   </td>
                   <td className="px-4 py-3 text-center">
-                    {g.remarks === "Passed" ? (
+                    {selectedRecord.subjectRemarks === "Passed" ? (
                       <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                    ) : g.remarks === "Failed" ? (
+                    ) : selectedRecord.subjectRemarks === "Failed" ? (
                       <AlertCircle className="w-4 h-4 text-red-400 mx-auto" />
                     ) : (
-                      <span className="text-[11px] text-slate-400">{g.remarks ?? "—"}</span>
+                      <span className="text-[11px] text-slate-400">{selectedRecord.subjectRemarks ?? "—"}</span>
                     )}
                   </td>
                 </tr>
-              ))}
+              ) : (
+                <tr><td colSpan={8} className="text-center py-4 text-xs text-slate-400">No grades detailed.</td></tr>
+              )}
             </tbody>
           </table>
         </Card>
@@ -319,7 +308,40 @@ export default function StudentProfile() {
   const { studentId } = useParams<{ studentId: string }>();
   const [activeTab, setActiveTab] = useState<TabKey>("personal");
 
-  const student = MOCK_STUDENTS.find((s) => s.id === Number(studentId));
+  const [student, setStudent] = useState<Student | null>(null);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [academicRecords, setAcademicRecords] = useState<AcademicRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      if (!studentId) return;
+      try {
+        setLoading(true);
+        const [studentData, enrollmentsData, recordsData] = await Promise.all([
+          getStudentDetails(Number(studentId)),
+          getStudentEnrollments(Number(studentId)),
+          getStudentAcademicRecords(Number(studentId)),
+        ]);
+        setStudent(studentData);
+        setEnrollments(enrollmentsData ?? []);
+        setAcademicRecords(recordsData ?? []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [studentId]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-slate-50 overflow-hidden items-center justify-center">
+        <p className="text-slate-400 font-semibold animate-pulse">Loading Profile...</p>
+      </div>
+    );
+  }
 
   if (!student) {
     return (
@@ -338,8 +360,8 @@ export default function StudentProfile() {
     );
   }
 
-  const currentEnrollment = MOCK_ENROLLMENTS.find(
-    (e) => e.studentId === student.id && e.status === "Enrolled"
+  const currentEnrollment = enrollments.find(
+    (e) => e.status === "Enrolled"
   );
 
   return (
@@ -448,8 +470,8 @@ export default function StudentProfile() {
           {/* ── Tab Content ── */}
           {activeTab === "personal"    && <PersonalInfoTab student={student} />}
           {activeTab === "eligibility" && <EligibilityTab student={student} />}
-          {activeTab === "history"     && <EnrollmentHistoryTab studentId={student.id} />}
-          {activeTab === "academic"    && <AcademicRecordTab studentId={student.id} />}
+          {activeTab === "history"     && <EnrollmentHistoryTab studentId={student.id} enrollments={enrollments} />}
+          {activeTab === "academic"    && <AcademicRecordTab studentId={student.id} records={academicRecords} />}
         </div>
       </main>
     </div>

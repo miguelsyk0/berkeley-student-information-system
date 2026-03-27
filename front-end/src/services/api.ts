@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:4000/api";
+import { authFetch, BASE_URL } from "./authFetch";
 
 // ── School Management ──────────────────────────────────────────────────────
 
@@ -18,6 +18,7 @@ export interface SchoolYear {
   startDate: string;
   endDate: string;
   isActive: boolean;
+  quarters: any[];
 }
 
 export interface Section {
@@ -29,6 +30,9 @@ export interface Section {
   adviserId: number | null;
   adviserName: string | null;
   studentCount: number;
+  roomNumber?: string;
+  capacity?: number;
+  enrolledCount?: number;
 }
 
 export interface Teacher {
@@ -39,13 +43,13 @@ export interface Teacher {
 }
 
 export async function getSchoolProfile(): Promise<School> {
-  const res = await fetch(`${BASE_URL}/school/profile`);
+  const res = await authFetch(`${BASE_URL}/school/profile`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function updateSchoolProfile(data: Partial<School>): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/school/profile`, {
+  const res = await authFetch(`${BASE_URL}/school/profile`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -55,13 +59,13 @@ export async function updateSchoolProfile(data: Partial<School>): Promise<{ resu
 }
 
 export async function getSchoolYears(): Promise<SchoolYear[]> {
-  const res = await fetch(`${BASE_URL}/school-years`);
+  const res = await authFetch(`${BASE_URL}/years`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function createSchoolYear(data: { startYear: string; endYear: string; isActive: boolean }): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/school-years`, {
+export async function addSchoolYear(data: { label: string; startDate: string; endDate: string; isActive: boolean; quarters?: any[] }): Promise<SchoolYear> {
+  const res = await authFetch(`${BASE_URL}/years`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -70,8 +74,8 @@ export async function createSchoolYear(data: { startYear: string; endYear: strin
   return res.json();
 }
 
-export async function updateSchoolYear(id: number, data: { startYear: string; endYear: string; isActive: boolean }): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/school-years/${id}`, {
+export async function updateSchoolYear(id: number, data: { label: string; startDate: string; endDate: string; isActive: boolean; quarters?: any[] }): Promise<SchoolYear> {
+  const res = await authFetch(`${BASE_URL}/years/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -81,21 +85,24 @@ export async function updateSchoolYear(id: number, data: { startYear: string; en
 }
 
 export async function deleteSchoolYear(id: number): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/school-years/${id}`, {
+  const res = await authFetch(`${BASE_URL}/years/${id}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function getSections(): Promise<Section[]> {
-  const res = await fetch(`${BASE_URL}/sections`);
+export async function getSections(schoolYearId?: number, gradeLevel?: number): Promise<Section[]> {
+  const params = new URLSearchParams();
+  if (schoolYearId) params.append("schoolYearId", String(schoolYearId));
+  if (gradeLevel) params.append("gradeLevel", String(gradeLevel));
+  const res = await authFetch(`${BASE_URL}/sections?${params}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function createSection(data: { name: string; gradeLevel: number; schoolYearId: number }): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/sections`, {
+export async function createSection(data: Partial<Section>): Promise<Section> {
+  const res = await authFetch(`${BASE_URL}/sections`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -104,8 +111,8 @@ export async function createSection(data: { name: string; gradeLevel: number; sc
   return res.json();
 }
 
-export async function updateSection(id: number, data: { name: string; gradeLevel: number; schoolYearId: number }): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/sections/${id}`, {
+export async function updateSection(id: number, data: Partial<Section>): Promise<Section> {
+  const res = await authFetch(`${BASE_URL}/sections/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -115,7 +122,7 @@ export async function updateSection(id: number, data: { name: string; gradeLevel
 }
 
 export async function deleteSection(id: number): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/sections/${id}`, {
+  const res = await authFetch(`${BASE_URL}/sections/${id}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(await res.text());
@@ -123,13 +130,13 @@ export async function deleteSection(id: number): Promise<{ result: string }> {
 }
 
 export async function getTeachers(): Promise<Teacher[]> {
-  const res = await fetch(`${BASE_URL}/teachers`);
+  const res = await authFetch(`${BASE_URL}/teachers`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function assignSectionAdviser(sectionId: number, teacherId: number | null): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/sections/${sectionId}/adviser`, {
+  const res = await authFetch(`${BASE_URL}/sections/${sectionId}/adviser`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ teacherId }),
@@ -151,7 +158,13 @@ export interface Student {
   birthdate: string;
   elementarySchoolName?: string;
   elementarySchoolId?: string;
+  elementarySchoolAddress?: string;
   elementaryGeneralAvg?: number;
+  elementaryCitation?: string;
+  otherCredential?: string;
+  otherCredentialRating?: string;
+  credentialExamDate?: string;
+  credentialTestingCenter?: string;
 }
 
 export interface Enrollment {
@@ -177,6 +190,7 @@ export interface AcademicRecord {
   q3Grade?: number;
   q4Grade?: number;
   finalGrade?: number;
+  finalLetterGrade?: string;
   subjectRemarks?: string;
 }
 
@@ -194,13 +208,13 @@ export async function getStudents(filters?: {
   if (filters?.sex) params.append("sex", filters.sex);
   if (filters?.search) params.append("search", filters.search);
 
-  const res = await fetch(`${BASE_URL}/students?${params}`);
+  const res = await authFetch(`${BASE_URL}/students?${params}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function addStudent(studentData: Partial<Student>): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/students`, {
+export async function addStudent(studentData: Partial<Student>): Promise<{ result: string; id: number }> {
+  const res = await authFetch(`${BASE_URL}/students`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(studentData),
@@ -210,13 +224,13 @@ export async function addStudent(studentData: Partial<Student>): Promise<{ resul
 }
 
 export async function getStudentDetails(id: number): Promise<Student> {
-  const res = await fetch(`${BASE_URL}/students/${id}`);
+  const res = await authFetch(`${BASE_URL}/students/${id}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function updateStudent(id: number, studentData: Partial<Student>): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/students/${id}`, {
+  const res = await authFetch(`${BASE_URL}/students/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(studentData),
@@ -226,7 +240,7 @@ export async function updateStudent(id: number, studentData: Partial<Student>): 
 }
 
 export async function deleteStudent(id: number): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/students/${id}`, {
+  const res = await authFetch(`${BASE_URL}/students/${id}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(await res.text());
@@ -240,7 +254,7 @@ export async function enrollStudent(enrollmentData: {
   gradeLevel: number;
   enrollmentDate?: string;
 }): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/students/enroll`, {
+  const res = await authFetch(`${BASE_URL}/students/enroll`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(enrollmentData),
@@ -250,19 +264,19 @@ export async function enrollStudent(enrollmentData: {
 }
 
 export async function getStudentEnrollments(studentId: number): Promise<Enrollment[]> {
-  const res = await fetch(`${BASE_URL}/students/${studentId}/enrollments`);
+  const res = await authFetch(`${BASE_URL}/students/${studentId}/enrollments`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function getStudentAcademicRecords(studentId: number): Promise<AcademicRecord[]> {
-  const res = await fetch(`${BASE_URL}/students/${studentId}/academic-records`);
+  const res = await authFetch(`${BASE_URL}/students/${studentId}/academic-records`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function addTransfereeTranscript(studentId: number, transcriptData: any): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/students/${studentId}/transcript`, {
+  const res = await authFetch(`${BASE_URL}/students/${studentId}/transcript`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(transcriptData),
@@ -288,7 +302,7 @@ export interface Subject {
 }
 
 export async function getSubjects(): Promise<Subject[]> {
-  const res = await fetch(`${BASE_URL}/subjects`);
+  const res = await authFetch(`${BASE_URL}/subjects`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -299,7 +313,7 @@ export async function createSubject(data: {
   gradeLevel: number;
   description?: string;
 }): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/subjects`, {
+  const res = await authFetch(`${BASE_URL}/subjects`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -314,7 +328,7 @@ export async function updateSubject(id: number, data: {
   gradeLevel: number;
   description?: string;
 }): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/subjects/${id}`, {
+  const res = await authFetch(`${BASE_URL}/subjects/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -324,7 +338,7 @@ export async function updateSubject(id: number, data: {
 }
 
 export async function deleteSubject(id: number): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/subjects/${id}`, {
+  const res = await authFetch(`${BASE_URL}/subjects/${id}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(await res.text());
@@ -332,7 +346,7 @@ export async function deleteSubject(id: number): Promise<{ result: string }> {
 }
 
 export async function reorderSubject(id: number, direction: "up" | "down"): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/subjects/${id}/order?direction=${direction}`, {
+  const res = await authFetch(`${BASE_URL}/subjects/${id}/order?direction=${direction}`, {
     method: "PATCH",
   });
   if (!res.ok) throw new Error(await res.text());
@@ -366,7 +380,7 @@ export async function getClassGradeSheet(section: string, schoolYear: string, qu
   const params = new URLSearchParams({ section, schoolYear });
   if (quarter) params.append("quarter", quarter.toString());
 
-  const res = await fetch(`${BASE_URL}/grades/class?${params}`);
+  const res = await authFetch(`${BASE_URL}/grades/class?${params}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -379,7 +393,7 @@ export async function saveClassGrades(gradesData: Array<{
   quarter: string;
   grade: number;
 }>): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/grades/class`, {
+  const res = await authFetch(`${BASE_URL}/grades/class`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(gradesData),
@@ -397,7 +411,7 @@ export async function getStudentGrades(studentId: number): Promise<Array<{
   finalGrade?: number;
   remarks?: string;
 }>> {
-  const res = await fetch(`${BASE_URL}/grades/student/${studentId}`);
+  const res = await authFetch(`${BASE_URL}/grades/student/${studentId}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -406,7 +420,7 @@ export async function getGeneralAverage(section: string, quarter?: string): Prom
   const params = new URLSearchParams({ section });
   if (quarter) params.append("quarter", quarter);
 
-  const res = await fetch(`${BASE_URL}/grades/general-average?${params}`);
+  const res = await authFetch(`${BASE_URL}/grades/general-average?${params}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -431,6 +445,12 @@ export interface ImportLog {
   errors: any[];
 }
 
+export async function getStudentSF10History(studentId: number): Promise<any[]> {
+  const res = await authFetch(`${BASE_URL}/sf10/history/${studentId}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function startImport(data: {
   fileUrl: string;
   section: string;
@@ -439,7 +459,7 @@ export async function startImport(data: {
   quarter: number;
   columnMappings: Array<{ sourceColumn: string; targetField: string }>;
 }): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/imports`, {
+  const res = await authFetch(`${BASE_URL}/imports`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -449,25 +469,25 @@ export async function startImport(data: {
 }
 
 export async function getImports(): Promise<ImportLog[]> {
-  const res = await fetch(`${BASE_URL}/imports`);
+  const res = await authFetch(`${BASE_URL}/imports`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function getImportHistory(): Promise<ImportLog[]> {
-  const res = await fetch(`${BASE_URL}/imports/history`);
+  const res = await authFetch(`${BASE_URL}/imports/history`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function getImportDetails(logId: number): Promise<ImportLog> {
-  const res = await fetch(`${BASE_URL}/imports/${logId}`);
+  const res = await authFetch(`${BASE_URL}/imports/${logId}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function confirmImport(logId: number, skipErrors?: boolean): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/imports/${logId}/confirm`, {
+  const res = await authFetch(`${BASE_URL}/imports/${logId}/confirm`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ skipErrors }),
@@ -479,13 +499,13 @@ export async function confirmImport(logId: number, skipErrors?: boolean): Promis
 // ── SF10 Management ────────────────────────────────────────────────────────
 
 export async function getSF10Data(studentId: number): Promise<any> {
-  const res = await fetch(`${BASE_URL}/sf10/${studentId}`);
+  const res = await authFetch(`${BASE_URL}/sf10/${studentId}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function generateBulkSF10(studentIds: number[], options?: any): Promise<{ result: string }> {
-  const res = await fetch(`${BASE_URL}/sf10/bulk`, {
+  const res = await authFetch(`${BASE_URL}/sf10/bulk`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ studentIds, options }),
@@ -495,7 +515,7 @@ export async function generateBulkSF10(studentIds: number[], options?: any): Pro
 }
 
 export async function exportSF10PDF(studentId: number): Promise<Blob> {
-  const res = await fetch(`${BASE_URL}/sf10/${studentId}/export`);
+  const res = await authFetch(`${BASE_URL}/sf10/${studentId}/export`);
   if (!res.ok) throw new Error(await res.text());
   return res.blob();
 }

@@ -1,25 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   ChevronRight, GraduationCap, Save, X,
-  User, School, CalendarDays, CheckCircle2,
+  User, School, CheckCircle2,
   UserPlus, Users, ArrowRight, Plus, Trash2,
-  BookOpen, Award, Building2, MapPin, AlertCircle,
-  ArrowLeft, ClipboardList, Hash, ChevronDown, ChevronUp,
+  BookOpen, Award, Building2, AlertCircle,
+  ArrowLeft, ClipboardList, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Sidebar from "@/components/sidebar";
-import { MOCK_STUDENTS, MOCK_ENROLLMENTS, GRADE_COLORS, getAge, formatDate } from "./mockData";
-import type { Student } from "../types";
+import { GRADE_COLORS } from "@/utils/gradeUtils";
+import { getAge } from "@/utils/dateUtils";
+import { getStudents, addStudent, enrollStudent, getStudentEnrollments } from "@/services/api";
+import type { Student, Enrollment } from "@/services/api";
 import { ROUTES } from "@/routes";
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1031,12 +1032,21 @@ function EnrollmentAssignmentPage({
   errors: Record<string, string>;
 }) {
   const [query, setQuery] = useState("");
-  const results = query.length >= 2
-    ? MOCK_STUDENTS.filter((s) => {
-        const full = `${s.lastName} ${s.firstName} ${s.lrn}`.toLowerCase();
-        return full.includes(query.toLowerCase());
-      }).slice(0, 5)
-    : [];
+  const [results, setResults] = useState<Student[]>([]);
+
+  useEffect(() => {
+    if (query.length < 2) {
+      setResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+         const data = await getStudents({ search: query });
+         setResults(data.slice(0, 5));
+      } catch (err) { console.error(err); }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const accent   = mode === "transferee" ? "violet" : "teal";
   const stepColor = mode === "transferee" ? "bg-violet-600" : "bg-teal-600";
@@ -1305,9 +1315,20 @@ export default function EnrollStudent() {
   const [schoolRecords, setSchoolRecords]             = useState<SchoolRecord[]>([EMPTY_SCHOOL_RECORD()]);
 
   // ── Derived ──
-  const existingEnrollment = selectedStudent && mode === "existing"
-    ? MOCK_ENROLLMENTS.find((e) => e.studentId === selectedStudent.id && e.schoolYear === schoolYear)
-    : null;
+  const [existingEnrollment, setExistingEnrollment] = useState<Enrollment | null>(null);
+  
+  useEffect(() => {
+    if (mode === "existing" && selectedStudent) {
+      getStudentEnrollments(selectedStudent.id)
+        .then(data => {
+          const found = data?.find(e => e.schoolYear === schoolYear && e.status !== "Dropped");
+          setExistingEnrollment(found ?? null);
+        })
+        .catch(console.error);
+    } else {
+      setExistingEnrollment(null);
+    }
+  }, [selectedStudent, schoolYear, mode]);
 
   const transfereeName = [transfereeForm.firstName, transfereeForm.lastName].filter(Boolean).join(" ");
   const accentColor    = mode === "transferee" ? "violet" : "teal";
@@ -1371,17 +1392,43 @@ export default function EnrollStudent() {
     return Object.keys(e).length === 0;
   }
 
-  function handleSubmit() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit() {
     if (!validateEnrollment()) return;
     if (mode === "transferee" && !validateTransfereeInfo()) return;
 
-    console.log("Submit", {
-      mode,
-      profile: mode === "transferee" ? transfereeForm : selectedStudent,
-      schoolRecords: mode === "transferee" ? schoolRecords : undefined,
-      enrollment: { schoolYear, gradeLevel, sectionId: selectedSectionId, sectionName: selectedSectionName },
-    });
-    navigate(ROUTES.students.root);
+    try {
+      setIsSubmitting(true);
+      if (mode === "transferee") {
+        const newStudent = await addStudent({
+          ...transfereeForm,
+          elementaryGeneralAvg: transfereeForm.elementaryGeneralAvg ? parseFloat(transfereeForm.elementaryGeneralAvg) : undefined,
+          birthdate: transfereeForm.birthdate || undefined
+        });
+        
+        await enrollStudent({
+          studentId: newStudent.id,
+          schoolYearId: 1, // To be replaced with actual lookup when school years API is used
+          gradeLevel: Number(gradeLevel),
+          sectionId: selectedSectionId!,
+        });
+        // Note: schoolRecords (prior transcript) parsing to be added here when backend endpoint is ready
+      } else if (mode === "existing" && selectedStudent) {
+        await enrollStudent({
+           studentId: selectedStudent.id,
+           schoolYearId: 1, // To be replaced with actual lookup when school years API is used
+           gradeLevel: Number(gradeLevel),
+           sectionId: selectedSectionId!,
+        });
+      }
+      navigate(ROUTES.students.root, { replace: true });
+    } catch (err) {
+      console.error(err);
+      alert("Failed to enroll: " + (err as Error).message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   // ── School record handlers ──
@@ -1496,9 +1543,10 @@ export default function EnrollStudent() {
           <Button
             size="sm"
             onClick={handleSubmit}
+            disabled={isSubmitting}
             className={`h-8 text-xs gap-1.5 ${accentColor === "violet" ? "bg-violet-600 hover:bg-violet-800" : "bg-teal-600 hover:bg-teal-800"}`}
           >
-            <Save className="w-3.5 h-3.5" /> Save & Enroll
+            <Save className="w-3.5 h-3.5" /> {isSubmitting ? "Saving..." : "Save & Enroll"}
           </Button>
         )}
       </>

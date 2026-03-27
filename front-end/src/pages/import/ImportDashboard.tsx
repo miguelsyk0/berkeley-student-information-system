@@ -1,16 +1,28 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Upload, Plus, ChevronRight, CheckCircle2,
   Clock, XCircle, AlertCircle, FileSpreadsheet,
   ExternalLink, History,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Sidebar from "@/components/sidebar";
-import { MOCK_IMPORT_LOGS, STATUS_STYLES, QUARTER_LABELS, GRADE_COLORS, relativeTime } from "../MockData";
+import { GRADE_COLORS, QUARTER_LABELS } from "@/utils/gradeUtils";
+import { relativeTime } from "@/utils/dateUtils";
+import { getImportHistory } from "@/services/api";
+import type { ImportLog } from "@/services/api";
 import { ROUTES } from "@/routes";
-import type { ImportLog } from "../types";
+
+// ── Import status helpers ──────────────────────────────────────────────────────
+
+const IMPORT_STATUS_STYLES = {
+  success:    { bg: "bg-emerald-100", text: "text-emerald-700", label: "Success"    },
+  partial:    { bg: "bg-amber-100",   text: "text-amber-700",   label: "Partial"    },
+  failed:     { bg: "bg-red-100",     text: "text-red-700",     label: "Failed"     },
+  processing: { bg: "bg-blue-100",    text: "text-blue-700",    label: "Processing" },
+} as const;
 
 // ── Status Icon ────────────────────────────────────────────────────────────────
 
@@ -24,7 +36,7 @@ function StatusIcon({ status }: { status: ImportLog["status"] }) {
 // ── Recent Import Row ──────────────────────────────────────────────────────────
 
 function RecentImportRow({ log, onClick }: { log: ImportLog; onClick: () => void }) {
-  const style = STATUS_STYLES[log.status];
+  const style = IMPORT_STATUS_STYLES[log.status] ?? IMPORT_STATUS_STYLES.processing;
   return (
     <div
       className="flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer group border-b border-slate-100 last:border-0"
@@ -39,7 +51,7 @@ function RecentImportRow({ log, onClick }: { log: ImportLog; onClick: () => void
           </Badge>
         </div>
         <p className="text-[11px] text-slate-400 mt-0.5">
-          <span className={`text-[10px] font-bold px-1 py-0.5 rounded mr-1.5 ${GRADE_COLORS[log.gradeLevel]}`}>
+          <span className={`text-[10px] font-bold px-1 py-0.5 rounded mr-1.5 ${GRADE_COLORS[log.gradeLevel] ?? ""}`}>
             G{log.gradeLevel}
           </span>
           {log.section} · {QUARTER_LABELS[log.quarter]} · by {log.importedBy}
@@ -58,21 +70,25 @@ function RecentImportRow({ log, onClick }: { log: ImportLog; onClick: () => void
 
 export default function ImportDashboard() {
   const navigate = useNavigate();
-  const logs = MOCK_IMPORT_LOGS;
+  const [logs, setLogs] = useState<ImportLog[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const successCount    = logs.filter((l) => l.status === "success").length;
-  const partialCount    = logs.filter((l) => l.status === "partial").length;
-  const failedCount     = logs.filter((l) => l.status === "failed").length;
-  const totalRowsEncoded = logs.reduce((acc, l) => acc + l.rowsEncoded, 0);
+  useEffect(() => {
+    getImportHistory()
+      .then(setLogs)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
-  // Sections with no import this quarter
+  const successCount     = logs.filter((l) => l.status === "success").length;
+  const partialCount     = logs.filter((l) => l.status === "partial").length;
+  const failedCount      = logs.filter((l) => l.status === "failed").length;
+  const totalRowsEncoded = logs.reduce((acc, l) => acc + (l.rowsEncoded ?? 0), 0);
+
   const importedSections = new Set(logs.map((l) => l.section));
-  const allSections = ["Integrity", "Honesty", "Loyalty", "Diligence", "Humility", "Wisdom", "Courage", "Excellence"];
-  const pendingSections = allSections.filter((s) => !importedSections.has(s));
-
-  const recentLogs = [...logs].sort(
-    (a, b) => new Date(b.importedAt).getTime() - new Date(a.importedAt).getTime()
-  ).slice(0, 5);
+  const recentLogs = [...logs]
+    .sort((a, b) => new Date(b.importedAt).getTime() - new Date(a.importedAt).getTime())
+    .slice(0, 5);
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -130,10 +146,10 @@ export default function ImportDashboard() {
           {/* ── Stat Cards ── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: "Successful",    value: successCount,    icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
-              { label: "Partial",       value: partialCount,    icon: AlertCircle,  color: "text-amber-600",   bg: "bg-amber-50"   },
-              { label: "Failed",        value: failedCount,     icon: XCircle,      color: "text-red-500",     bg: "bg-red-50"     },
-              { label: "Rows Encoded",  value: totalRowsEncoded, icon: FileSpreadsheet, color: "text-teal-600", bg: "bg-teal-50" },
+              { label: "Successful",   value: successCount,     icon: CheckCircle2,   color: "text-emerald-600", bg: "bg-emerald-50" },
+              { label: "Partial",      value: partialCount,     icon: AlertCircle,    color: "text-amber-600",   bg: "bg-amber-50"   },
+              { label: "Failed",       value: failedCount,      icon: XCircle,        color: "text-red-500",     bg: "bg-red-50"     },
+              { label: "Rows Encoded", value: totalRowsEncoded, icon: FileSpreadsheet, color: "text-teal-600",   bg: "bg-teal-50"    },
             ].map(({ label, value, icon: Icon, color, bg }) => (
               <Card key={label} className="border-0 shadow-sm">
                 <CardContent className="p-4 flex items-center gap-3">
@@ -162,46 +178,51 @@ export default function ImportDashboard() {
                 </button>
               </div>
               <Card className="border-0 shadow-sm overflow-hidden">
-                {recentLogs.map((log) => (
-                  <RecentImportRow
-                    key={log.id}
-                    log={log}
-                    onClick={() => navigate(`${ROUTES.import.history}/${log.id}`)}
-                  />
-                ))}
+                {loading ? (
+                  <div className="flex items-center justify-center py-12 text-slate-400">
+                    <div className="w-6 h-6 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mr-3" />
+                    <span className="text-sm">Loading...</span>
+                  </div>
+                ) : recentLogs.length === 0 ? (
+                  <div className="flex flex-col items-center py-12 text-slate-400">
+                    <FileSpreadsheet className="w-8 h-8 mb-2 opacity-30" />
+                    <p className="text-xs font-semibold">No imports yet</p>
+                  </div>
+                ) : (
+                  recentLogs.map((log) => (
+                    <RecentImportRow
+                      key={log.id}
+                      log={log}
+                      onClick={() => navigate(`${ROUTES.import.history}/${log.id}`)}
+                    />
+                  ))
+                )}
               </Card>
             </div>
 
-            {/* ── Pending Sections ── */}
+            {/* ── Sections with imports ── */}
             <div className="space-y-2">
               <p className="text-sm font-black text-slate-700">
-                Sections Pending Q1 Import
-                <Badge className="ml-2 bg-amber-100 text-amber-700 border-0 text-[10px]">
-                  {pendingSections.length}
+                Sections with Imports
+                <Badge className="ml-2 bg-teal-100 text-teal-700 border-0 text-[10px]">
+                  {importedSections.size}
                 </Badge>
               </p>
               <Card className="border-0 shadow-sm">
                 <CardContent className="p-4 space-y-2">
-                  {pendingSections.length === 0 ? (
+                  {importedSections.size === 0 ? (
                     <div className="flex flex-col items-center py-6 text-slate-400">
-                      <CheckCircle2 className="w-8 h-8 mb-2 text-emerald-400" />
-                      <p className="text-xs font-semibold">All sections imported!</p>
+                      <ExternalLink className="w-8 h-8 mb-2 opacity-20" />
+                      <p className="text-xs font-semibold">No sections imported yet</p>
                     </div>
                   ) : (
-                    pendingSections.map((sec) => (
+                    Array.from(importedSections).sort().map((sec) => (
                       <div
                         key={sec}
                         className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
                       >
                         <p className="text-xs font-semibold text-slate-700">{sec}</p>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-6 text-[11px] px-2 gap-1"
-                          onClick={() => navigate(ROUTES.import.new)}
-                        >
-                          <Upload className="w-3 h-3" /> Import
-                        </Button>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                       </div>
                     ))
                   )}

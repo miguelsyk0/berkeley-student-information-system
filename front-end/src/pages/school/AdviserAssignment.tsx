@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   UserCheck, ChevronRight, Search, UserX,
   CheckCircle2, AlertCircle, ArrowRight, Users,
@@ -15,30 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Sidebar from "@/components/sidebar";
-import type { Section, Teacher } from "../types";
+import type { Section, Teacher, SchoolYear } from "@/services/api";
+import { getSections, getTeachers, assignSectionAdviser, getSchoolYears } from "@/services/api";
 
-// ── Mock Data ──────────────────────────────────────────────────────────────────
-
-const MOCK_TEACHERS: Teacher[] = [
-  { id: 1, name: "Ms. Andrea Reyes",    email: "a.reyes@school.edu.ph",   employeeId: "EMP-001" },
-  { id: 2, name: "Mr. Ben Santos",      email: "b.santos@school.edu.ph",  employeeId: "EMP-002" },
-  { id: 3, name: "Ms. Claire Cruz",     email: "c.cruz@school.edu.ph",    employeeId: "EMP-003" },
-  { id: 4, name: "Mr. Dan Lim",         email: "d.lim@school.edu.ph",     employeeId: "EMP-004" },
-  { id: 5, name: "Ms. Elena Garcia",    email: "e.garcia@school.edu.ph",  employeeId: "EMP-005" },
-  { id: 6, name: "Mr. Felix Torres",    email: "f.torres@school.edu.ph",  employeeId: "EMP-006" },
-  { id: 7, name: "Ms. Grace Navarro",   email: "g.navarro@school.edu.ph", employeeId: "EMP-007" },
-];
-
-const MOCK_SECTIONS: Section[] = [
-  { id: 1, name: "Integrity",  gradeLevel: 7,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: 1,    adviserName: "Ms. Andrea Reyes",  studentCount: 38 },
-  { id: 2, name: "Honesty",    gradeLevel: 7,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: 2,    adviserName: "Mr. Ben Santos",    studentCount: 36 },
-  { id: 3, name: "Loyalty",    gradeLevel: 7,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: null, adviserName: null,                studentCount: 34 },
-  { id: 4, name: "Diligence",  gradeLevel: 8,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: 3,    adviserName: "Ms. Claire Cruz",   studentCount: 40 },
-  { id: 5, name: "Humility",   gradeLevel: 8,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: 4,    adviserName: "Mr. Dan Lim",       studentCount: 38 },
-  { id: 6, name: "Wisdom",     gradeLevel: 9,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: 5,    adviserName: "Ms. Elena Garcia",  studentCount: 35 },
-  { id: 7, name: "Courage",    gradeLevel: 9,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: null, adviserName: null,                studentCount: 32 },
-  { id: 8, name: "Excellence", gradeLevel: 10, schoolYearId: 1, schoolYear: "2025-2026", adviserId: 6,    adviserName: "Mr. Felix Torres",  studentCount: 37 },
-];
 
 const GRADE_COLORS: Record<number, string> = {
   7:  "bg-teal-100 text-teal-800",
@@ -151,32 +130,53 @@ function AssignModal({
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function AdviserAssignment() {
-  const [sections, setSections] = useState(MOCK_SECTIONS);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
   const [search, setSearch] = useState("");
-  const [yearFilter, setYearFilter] = useState("2025-2026");
+  const [yearFilter, setYearFilter] = useState("1"); // Use ID for filtering
   const [selectedSection, setSelectedSection] = useState<Section | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const unassigned = sections.filter((s) => !s.adviserId && s.schoolYear === yearFilter);
-  const assigned   = sections.filter((s) =>  s.adviserId && s.schoolYear === yearFilter);
+  useEffect(() => {
+    getSchoolYears().then((sys) => {
+      setSchoolYears(sys);
+      if (sys.length > 0 && yearFilter === "1") setYearFilter(String(sys[0].id));
+    }).catch(console.error);
+    getTeachers().then(setTeachers).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (yearFilter) {
+      getSections(Number(yearFilter)).then(setSections).catch(console.error);
+    }
+  }, [yearFilter]);
+
+  const unassigned = sections.filter((s) => !s.adviserId);
+  const assigned   = sections.filter((s) =>  s.adviserId);
 
   const filteredSections = sections.filter((s) => {
-    const matchYear = s.schoolYear === yearFilter;
     const matchSearch =
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       (s.adviserName ?? "").toLowerCase().includes(search.toLowerCase());
-    return matchYear && matchSearch;
+    return matchSearch;
   });
 
-  function handleAssign(sectionId: number, teacherId: number | null) {
-    const teacher = MOCK_TEACHERS.find((t) => t.id === teacherId) ?? null;
-    setSections((prev) =>
-      prev.map((s) =>
-        s.id === sectionId
-          ? { ...s, adviserId: teacherId, adviserName: teacher?.name ?? null }
-          : s
-      )
-    );
+  async function handleAssign(sectionId: number, teacherId: number | null) {
+    try {
+      await assignSectionAdviser(sectionId, teacherId);
+      const teacher = teachers.find((t) => t.id === teacherId) ?? null;
+      setSections((prev) =>
+        prev.map((s) =>
+          s.id === sectionId
+            ? { ...s, adviserId: teacherId, adviserName: teacher?.name ?? null }
+            : s
+        )
+      );
+    } catch (err) {
+      console.error(err);
+      alert("Failed to assign adviser.");
+    }
   }
 
   function openModal(section: Section) {
@@ -212,8 +212,9 @@ export default function AdviserAssignment() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="2025-2026">2025–2026</SelectItem>
-                <SelectItem value="2024-2025">2024–2025</SelectItem>
+                {schoolYears.map((sy) => (
+                  <SelectItem key={sy.id} value={String(sy.id)}>{sy.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -222,7 +223,7 @@ export default function AdviserAssignment() {
         <div className="p-6 space-y-6 max-w-4xl">
           <div>
             <h1 className="text-2xl font-black text-slate-800">Adviser Assignment</h1>
-            <p className="text-sm text-slate-400 mt-0.5">Assign or reassign class advisers to sections for S.Y. {yearFilter}.</p>
+            <p className="text-sm text-slate-400 mt-0.5">Assign or reassign class advisers to sections.</p>
           </div>
 
           {/* Summary cards */}
@@ -255,7 +256,7 @@ export default function AdviserAssignment() {
                   <UserCheck className="w-4 h-4 text-teal-600" />
                 </div>
                 <div>
-                  <p className="text-xl font-black text-slate-800">{MOCK_TEACHERS.length}</p>
+                  <p className="text-xl font-black text-slate-800">{teachers.length}</p>
                   <p className="text-[11px] text-slate-400">Teachers</p>
                 </div>
               </CardContent>
@@ -277,7 +278,7 @@ export default function AdviserAssignment() {
           <Card className="border-0 shadow-sm overflow-hidden">
             <CardHeader className="py-4 px-5 border-b border-slate-100">
               <CardTitle className="text-sm font-black text-slate-700">
-                All Sections — S.Y. {yearFilter}
+                All Sections
               </CardTitle>
             </CardHeader>
             <div className="divide-y divide-slate-100">
@@ -338,7 +339,7 @@ export default function AdviserAssignment() {
 
       <AssignModal
         section={selectedSection}
-        teachers={MOCK_TEACHERS}
+        teachers={teachers}
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onAssign={handleAssign}

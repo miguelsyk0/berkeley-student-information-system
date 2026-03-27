@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Users, Plus, Pencil, Trash2, ChevronRight,
   Search, UserCheck, BookOpen,
@@ -16,21 +16,10 @@ import {
   AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import Sidebar from "@/components/sidebar";
-import type { Section } from "../types";
-import SectionForm from "./SectionForm"; // form component
+import SectionForm from "./SectionForm";
+import { getSections, deleteSection, createSection, updateSection, getSchoolYears } from "@/services/api";
+import type { Section, SchoolYear } from "@/services/api";
 
-// ── Mock Data ──────────────────────────────────────────────────────────────────
-
-const MOCK_SECTIONS: Section[] = [
-  { id: 1, name: "Integrity",  gradeLevel: 7,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: 1, adviserName: "Ms. A. Reyes",    studentCount: 38, roomNumber: "201" },
-  { id: 2, name: "Honesty",    gradeLevel: 7,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: 2, adviserName: "Mr. B. Santos",   studentCount: 36, roomNumber: "202" },
-  { id: 3, name: "Loyalty",    gradeLevel: 7,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: null, adviserName: null,           studentCount: 34, roomNumber: "203" },
-  { id: 4, name: "Diligence",  gradeLevel: 8,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: 3, adviserName: "Ms. C. Cruz",     studentCount: 40, roomNumber: "301" },
-  { id: 5, name: "Humility",   gradeLevel: 8,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: 4, adviserName: "Mr. D. Lim",      studentCount: 38, roomNumber: "302" },
-  { id: 6, name: "Wisdom",     gradeLevel: 9,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: 5, adviserName: "Ms. E. Garcia",   studentCount: 35, roomNumber: "401" },
-  { id: 7, name: "Courage",    gradeLevel: 9,  schoolYearId: 1, schoolYear: "2025-2026", adviserId: null, adviserName: null,           studentCount: 32, roomNumber: "402" },
-  { id: 8, name: "Excellence", gradeLevel: 10, schoolYearId: 1, schoolYear: "2025-2026", adviserId: 6, adviserName: "Mr. F. Torres",   studentCount: 37, roomNumber: "501" },
-];
 
 // ── Grade Level badge color map ───────────────────────────────────────────────
 
@@ -65,7 +54,7 @@ function SectionCard({
             </div>
             <div>
               <p className="text-sm font-black text-slate-800">{section.gradeLevel} — {section.name}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">S.Y. {section.schoolYear}{section.roomNumber ? ` · Room ${section.roomNumber}` : ""}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">S.Y. ID: {section.schoolYearId}{section.roomNumber ? ` · Room ${section.roomNumber}` : ""}</p>
             </div>
           </div>
 
@@ -133,20 +122,39 @@ function SectionCard({
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function SectionList() {
-  const [sections, setSections] = useState(MOCK_SECTIONS);
+  const [sections, setSections] = useState<Section[]>([]);
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("all");
-  const [yearFilter, setYearFilter] = useState("2025-2026");
+  const [yearFilter, setYearFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editingSection, setEditingSection] = useState<Section | null>(null);
+  const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
+
+  useEffect(() => {
+    getSchoolYears().then(setSchoolYears).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    loadSections();
+  }, [gradeFilter, yearFilter]);
+
+  async function loadSections() {
+    try {
+      const data = await getSections(
+        yearFilter && yearFilter !== "all" ? Number(yearFilter) : undefined,
+        gradeFilter !== "all" ? Number(gradeFilter) : undefined
+      );
+      setSections(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
 
   const filtered = sections.filter((s) => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
       (s.adviserName ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchGrade = gradeFilter === "all" || String(s.gradeLevel) === gradeFilter;
-    const matchYear = s.schoolYear === yearFilter;
-    return matchSearch && matchGrade && matchYear;
+    return matchSearch;
   });
 
   const byGrade = [7, 8, 9, 10].map((g) => ({
@@ -154,8 +162,15 @@ export default function SectionList() {
     sections: filtered.filter((s) => s.gradeLevel === g),
   })).filter((g) => g.sections.length > 0);
 
-  function handleDelete(id: number) {
-    setSections((prev) => prev.filter((s) => s.id !== id));
+  async function handleDelete(id: number) {
+    if (!confirm("Are you sure you want to delete this section?")) return;
+    try {
+      await deleteSection(id);
+      setSections((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete section.");
+    }
   }
 
   function openNewSection() {
@@ -168,12 +183,19 @@ export default function SectionList() {
     setFormOpen(true);
   }
 
-  function handleSaveSection(data: Omit<Section, "id" | "studentCount" | "adviserName">) {
-    if (editingSection) {
-      setSections((prev) => prev.map((sec) => (sec.id === editingSection.id ? { ...editingSection, ...data } as Section : sec)));
-    } else {
-      const nextId = Math.max(0, ...sections.map((sec) => sec.id)) + 1;
-      setSections((prev) => [...prev, { id: nextId, studentCount: 0, adviserName: null, ...data } as Section]);
+  async function handleSaveSection(data: Partial<Section>) {
+    try {
+      if (editingSection) {
+        const updated = await updateSection(editingSection.id, data);
+        setSections((prev) => prev.map((sec) => (sec.id === editingSection.id ? updated : sec)));
+      } else {
+        const added = await createSection(data);
+        setSections((prev) => [...prev, added]);
+      }
+      setFormOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save section.");
     }
   }
 
@@ -203,7 +225,7 @@ export default function SectionList() {
             <div>
               <h1 className="text-2xl font-black text-slate-800">Sections</h1>
               <p className="text-sm text-slate-400 mt-0.5">
-                {filtered.length} section{filtered.length !== 1 ? "s" : ""} · {filtered.reduce((a, b) => a + b.studentCount, 0)} students total
+                {filtered.length} section{filtered.length !== 1 ? "s" : ""} · {filtered.reduce((a, b) => a + (b.enrolledCount || 0), 0)} students total
               </p>
             </div>
 
@@ -219,11 +241,13 @@ export default function SectionList() {
               </div>
               <Select value={yearFilter} onValueChange={setYearFilter}>
                 <SelectTrigger className="h-8 w-32 text-xs border-slate-200">
-                  <SelectValue />
+                  <SelectValue placeholder="All Years" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="2025-2026">2025–2026</SelectItem>
-                  <SelectItem value="2024-2025">2024–2025</SelectItem>
+                  <SelectItem value="all">All Years</SelectItem>
+                  {schoolYears.map((sy) => (
+                    <SelectItem key={sy.id} value={String(sy.id)}>{sy.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select value={gradeFilter} onValueChange={setGradeFilter}>

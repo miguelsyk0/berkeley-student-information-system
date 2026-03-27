@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   CalendarDays, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, ChevronUp, CheckCircle2, Circle,
@@ -13,38 +13,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import Sidebar from "@/components/sidebar";
 import type { SchoolYear, Quarter } from "../types";
-import SchoolYearForm from "./SchoolYearForm"; // <-- form component added
+import SchoolYearForm from "./SchoolYearForm";
+import { getSchoolYears, addSchoolYear, updateSchoolYear, deleteSchoolYear } from "@/services/api";
 
-// ── Mock Data ──────────────────────────────────────────────────────────────────
-
-const MOCK_SCHOOL_YEARS: SchoolYear[] = [
-  {
-    id: 1,
-    label: "2025-2026",
-    startDate: "2025-06-02",
-    endDate: "2026-04-03",
-    isActive: true,
-    quarters: [
-      { id: 1, schoolYearId: 1, number: 1, label: "1st Quarter", startDate: "2025-06-02", endDate: "2025-08-15", isActive: true },
-      { id: 2, schoolYearId: 1, number: 2, label: "2nd Quarter", startDate: "2025-08-18", endDate: "2025-10-17", isActive: false },
-      { id: 3, schoolYearId: 1, number: 3, label: "3rd Quarter", startDate: "2025-11-03", endDate: "2026-01-30", isActive: false },
-      { id: 4, schoolYearId: 1, number: 4, label: "4th Quarter", startDate: "2026-02-02", endDate: "2026-04-03", isActive: false },
-    ],
-  },
-  {
-    id: 2,
-    label: "2024-2025",
-    startDate: "2024-06-03",
-    endDate: "2025-04-04",
-    isActive: false,
-    quarters: [
-      { id: 5, schoolYearId: 2, number: 1, label: "1st Quarter", startDate: "2024-06-03", endDate: "2024-08-16", isActive: false },
-      { id: 6, schoolYearId: 2, number: 2, label: "2nd Quarter", startDate: "2024-08-19", endDate: "2024-10-18", isActive: false },
-      { id: 7, schoolYearId: 2, number: 3, label: "3rd Quarter", startDate: "2024-11-04", endDate: "2025-01-31", isActive: false },
-      { id: 8, schoolYearId: 2, number: 4, label: "4th Quarter", startDate: "2025-02-03", endDate: "2025-04-04", isActive: false },
-    ],
-  },
-];
 
 // ── Quarter Status Icon ────────────────────────────────────────────────────────
 
@@ -180,12 +151,32 @@ function SchoolYearCard({
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function SchoolYearList() {
-  const [schoolYears, setSchoolYears] = useState(MOCK_SCHOOL_YEARS);
+  const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editingSY, setEditingSY] = useState<SchoolYear | null>(null);
 
-  function handleDelete(id: number) {
-    setSchoolYears((prev) => prev.filter((sy) => sy.id !== id));
+  useEffect(() => {
+    loadSchoolYears();
+  }, []);
+
+  async function loadSchoolYears() {
+    try {
+      const data = await getSchoolYears();
+      setSchoolYears(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm("Are you sure you want to delete this school year?")) return;
+    try {
+      await deleteSchoolYear(id);
+      setSchoolYears((prev) => prev.filter((sy) => sy.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete school year.");
+    }
   }
 
   function openNew() {
@@ -198,14 +189,19 @@ export default function SchoolYearList() {
     setFormOpen(true);
   }
 
-  function handleSave(data: Omit<SchoolYear, "id" | "quarters"> & { quarters: Omit<Quarter, "id" | "schoolYearId">[] }) {
-    if (editingSY) {
-      // update existing entry
-      setSchoolYears((prev) => prev.map((s) => (s.id === editingSY.id ? { ...editingSY, ...data } as SchoolYear : s)));
-    } else {
-      // assign a new id for demo purposes
-      const nextId = Math.max(0, ...schoolYears.map((s) => s.id)) + 1;
-      setSchoolYears((prev) => [...prev, { id: nextId, ...data } as SchoolYear]);
+  async function handleSave(data: Omit<SchoolYear, "id" | "quarters"> & { quarters: Omit<Quarter, "id" | "schoolYearId">[] }) {
+    try {
+      if (editingSY) {
+        const updated = await updateSchoolYear(editingSY.id, data);
+        setSchoolYears((prev) => prev.map((s) => (s.id === editingSY.id ? updated : s)));
+      } else {
+        const added = await addSchoolYear(data);
+        setSchoolYears((prev) => [...prev, added]);
+      }
+      setFormOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save school year.");
     }
   }
 

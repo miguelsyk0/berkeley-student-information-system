@@ -1,11 +1,10 @@
 import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import {
-  ChevronRight, Search, Filter, Save, X, Edit2, Check,
-  ClipboardList, TrendingUp, FileDown, Users, BookOpen,
-  ChevronDown, AlertCircle, CheckCircle2, Download,
+  ChevronRight, Search, Save, X, Edit2, Check,
+  ClipboardList, TrendingUp, FileDown, Users,
+  AlertCircle, CheckCircle2, Download,
   Printer, RefreshCw, Eye, User, FileText,
-  ArrowLeft, MoreHorizontal, BarChart2,
+  BarChart2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -871,7 +870,6 @@ export function GeneralAverageView({ onNavigate }: { onNavigate: (page: string, 
 
 export function SF10Home({ onNavigate }: { onNavigate: (page: string, params?: any) => void }) {
   const [search, setSearch] = useState("");
-  const [section, setSection] = useState("");
 
   const filtered = MOCK_STUDENTS.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) || s.lrn.includes(search)
@@ -1426,11 +1424,9 @@ export function BulkSF10Generation({ onNavigate }: { onNavigate: (page: string, 
 
 export default function App() {
   const [page, setPage] = useState("grade-home");
-  const [params, setParams] = useState<any>({});
 
-  function navigate(p: string, newParams?: any) {
+  function navigate(p: string) {
     setPage(p);
-    setParams(newParams ?? {});
     window.scrollTo(0, 0);
   }
 

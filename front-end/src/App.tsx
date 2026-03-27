@@ -1,13 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-
-// Firebase Imports
-import { firebaseConfig } from "./firebase-config";
-import { initializeApp } from "firebase/app";
-import { getFirestore } from 'firebase/firestore/lite';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { Loader2 } from "lucide-react";
 
 // ── Auth ───────────────────────────────────────────────────────────────────────
 import Login from "@/pages/auth/Login";
-// import ForgotPassword from "@/pages/auth/ForgotPassword";
 
 // ── Dashboard ──────────────────────────────────────────────────────────────────
 import Dashboard from "@/pages/Dashboard";
@@ -44,78 +40,106 @@ import SF10Home            from "@/pages/sf10/SF10Home";
 import SingleStudentSF10   from "@/pages/sf10/SingleStudentSF10";
 import BulkSF10Generation  from "@/pages/sf10/BulkSF10Generation";
 
+// ── Protected Route ────────────────────────────────────────────────────────────
+
+function ProtectedRoute() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+          <p className="text-sm text-slate-400 font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
+}
+
+// ── App ────────────────────────────────────────────────────────────────────────
+
 export default function App() {
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  
   return (
-    <BrowserRouter>
-      <Routes>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
 
-        {/* ── Root redirect ── */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          {/* ── Root redirect ── */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-        {/* ── Auth (no sidebar) ── */}
-        <Route path="/login" element={<Login />} />
-        {/* <Route path="/forgot-password" element={<ForgotPassword />} /> */}
+          {/* ── Auth (public) ── */}
+          <Route path="/login" element={<Login />} />
 
-        {/* ── Dashboard ── */}
-        <Route path="/dashboard" element={<Dashboard />} />
+          {/* ── Protected routes ── */}
+          <Route element={<ProtectedRoute />}>
 
-        {/* ── School & Sections ── */}
-        <Route path="/school">
-          <Route index           element={<Navigate to="/school/profile" replace />} />
-          <Route path="profile"  element={<SchoolProfile />} />
-          <Route path="years"    element={<SchoolYearList />} />
-          <Route path="sections" element={<SectionList />} />
-          <Route path="advisers" element={<AdviserAssignment />} />
-        </Route>
+            {/* ── Dashboard ── */}
+            <Route path="/dashboard" element={<Dashboard />} />
 
-        {/* ── Students ── */}
-        <Route path="/students">
-          <Route index                  element={<StudentList />} />
-          <Route path="add"             element={<StudentForm />} />
-          <Route path="enroll"          element={<EnrollStudent />} />
-          <Route path=":studentId"      element={<StudentProfile />} />
-          <Route path=":studentId/edit" element={<StudentForm />} />
-        </Route>
+            {/* ── School & Sections ── */}
+            <Route path="/school">
+              <Route index           element={<Navigate to="/school/profile" replace />} />
+              <Route path="profile"  element={<SchoolProfile />} />
+              <Route path="years"    element={<SchoolYearList />} />
+              <Route path="sections" element={<SectionList />} />
+              <Route path="advisers" element={<AdviserAssignment />} />
+            </Route>
 
-        {/* ── Subjects ── */}
-        <Route path="/subjects">
-          <Route index                    element={<SubjectList />} />
-          <Route path="add"               element={<SubjectForm />} />
-          <Route path=":subjectId/edit"   element={<SubjectForm />} />
-        </Route>
+            {/* ── Students ── */}
+            <Route path="/students">
+              <Route index                  element={<StudentList />} />
+              <Route path="add"             element={<StudentForm />} />
+              <Route path="enroll"          element={<EnrollStudent />} />
+              <Route path=":studentId"      element={<StudentProfile />} />
+              <Route path=":studentId/edit" element={<StudentForm />} />
+            </Route>
 
-        {/* ── Grade Import ── */}
-        <Route path="/import">
-          <Route index                element={<ImportDashboard />} />
-          <Route path="new"           element={<NewImport />} />
-          <Route path="history"       element={<ImportHistoryList />} />
-          <Route path="history/:logId" element={<ImportLogDetail />} />
-        </Route>
+            {/* ── Subjects ── */}
+            <Route path="/subjects">
+              <Route index                    element={<SubjectList />} />
+              <Route path="add"               element={<SubjectForm />} />
+              <Route path=":subjectId/edit"   element={<SubjectForm />} />
+            </Route>
 
-        {/* ── Grade Encoding ── */}
-        <Route path="/grades">
-          <Route index                          element={<GradeEncodingHome />} />
-          <Route path="class"                   element={<ClassGradeSheet />} />
-          <Route path="class/:sectionId"        element={<ClassGradeSheet />} />
-          <Route path="student"                 element={<StudentGradeView />} />
-          <Route path="student/:studentId"      element={<StudentGradeView />} />
-          <Route path="general-average"         element={<GeneralAverageView />} />
-        </Route>
+            {/* ── Grade Import ── */}
+            <Route path="/import">
+              <Route index                element={<ImportDashboard />} />
+              <Route path="new"           element={<NewImport />} />
+              <Route path="history"       element={<ImportHistoryList />} />
+              <Route path="history/:logId" element={<ImportLogDetail />} />
+            </Route>
 
-        {/* ── SF10 Generation ── */}
-        <Route path="/sf10">
-          <Route index                          element={<SF10Home />} />
-          <Route path="student/:studentId"      element={<SingleStudentSF10 />} />
-          <Route path="bulk"                    element={<BulkSF10Generation />} />
-        </Route>
+            {/* ── Grade Encoding ── */}
+            <Route path="/grades">
+              <Route index                          element={<GradeEncodingHome />} />
+              <Route path="class"                   element={<ClassGradeSheet />} />
+              <Route path="class/:sectionId"        element={<ClassGradeSheet />} />
+              <Route path="student"                 element={<StudentGradeView />} />
+              <Route path="student/:studentId"      element={<StudentGradeView />} />
+              <Route path="general-average"         element={<GeneralAverageView />} />
+            </Route>
 
-        {/* ── 404 fallback ── */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            {/* ── SF10 Generation ── */}
+            <Route path="/sf10">
+              <Route index                          element={<SF10Home />} />
+              <Route path="student/:studentId"      element={<SingleStudentSF10 />} />
+              <Route path="bulk"                    element={<BulkSF10Generation />} />
+            </Route>
 
-      </Routes>
-    </BrowserRouter>
+          </Route>
+
+          {/* ── 404 fallback ── */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

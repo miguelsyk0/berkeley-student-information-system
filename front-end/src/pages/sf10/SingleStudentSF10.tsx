@@ -1,19 +1,51 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChevronRight, Printer, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Sidebar from "@/components/sidebar";
-import { MOCK_STUDENTS } from "../encoding/MockData";
 import { SF10FrontPage, SF10BackPage } from "./SF10Preview";
 import { ROUTES } from "@/routes";
+import { getStudentDetails, getSubjects } from "@/services/api";
+import type { Student, Subject } from "@/services/api";
 
 export default function SingleStudentSF10() {
   const navigate  = useNavigate();
   const { studentId } = useParams<{ studentId: string }>();
   const [page, setPage] = useState<"front" | "back">("front");
+  const [student, setStudent] = useState<Student | null>(null);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const student =
-    MOCK_STUDENTS.find((s) => s.studentId === Number(studentId)) ?? MOCK_STUDENTS[1];
+  useEffect(() => {
+    if (!studentId) return;
+    async function load() {
+      try {
+        const [stu, subjs] = await Promise.all([
+          getStudentDetails(Number(studentId)),
+          getSubjects(),
+        ]);
+        setStudent(stu);
+        setSubjects(subjs);
+      } catch (err) {
+        console.error("Failed to load student", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [studentId]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-slate-50 items-center justify-center">
+        <p className="text-slate-400 animate-pulse font-semibold">Loading SF10...</p>
+      </div>
+    );
+  }
+
+  const stuData = student
+    ? { name: `${student.lastName}, ${student.firstName}`, lrn: student.lrn }
+    : { name: "Unknown Student", lrn: "" };
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -33,7 +65,7 @@ export default function SingleStudentSF10() {
           </button>
           <ChevronRight className="w-3 h-3 text-slate-300" />
           <span className="text-xs font-semibold text-slate-600 truncate max-w-48">
-            {student.name}
+            {stuData.name}
           </span>
           <div className="ml-auto flex gap-2">
             <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5">
@@ -51,7 +83,7 @@ export default function SingleStudentSF10() {
             <div>
               <h1 className="text-2xl font-black text-slate-800">SF10 Preview</h1>
               <p className="text-sm text-slate-400 mt-0.5">
-                {student.name} · LRN: {student.lrn}
+                {stuData.name} · LRN: {stuData.lrn}
               </p>
             </div>
             <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm">
@@ -73,8 +105,8 @@ export default function SingleStudentSF10() {
           <div className="flex justify-center pb-6">
             <div className="shadow-2xl rounded-lg overflow-hidden">
               {page === "front"
-                ? <SF10FrontPage student={student} />
-                : <SF10BackPage  student={student} />
+                ? <SF10FrontPage student={stuData} subjects={subjects} />
+                : <SF10BackPage  student={stuData} />
               }
             </div>
           </div>

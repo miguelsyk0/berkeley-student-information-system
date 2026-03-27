@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronRight, CheckCircle2, AlertCircle, ClipboardList, BarChart2,
@@ -11,27 +11,52 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import Sidebar from "@/components/sidebar";
-import { SECTIONS, GRADE_COLORS } from "./MockData";
+import { GRADE_COLORS } from "@/utils/gradeUtils";
 import { ROUTES } from "@/routes";
+import { getSections, getSchoolYears } from "@/services/api";
+import type { Section, SchoolYear } from "@/services/api";
 
 export default function GradeEncodingHome() {
   const navigate = useNavigate();
-  const [schoolYear, setSchoolYear] = useState("2025-2026");
+  const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
+  const [schoolYearId, setSchoolYearId] = useState<string>("");
+  const [sections, setSections] = useState<Section[]>([]);
   const [gradeFilter, setGradeFilter] = useState("all");
   const [quarter, setQuarter] = useState("1");
 
-  const sectionData = SECTIONS.map((sec, i) => {
-    const gl = [7, 7, 7, 8, 8, 9, 9, 10][i];
-    const encoded = Math.floor(Math.random() * 10) + 30;
-    const total   = 38 + Math.floor(Math.random() * 5);
-    return { name: sec, gradeLevel: gl, encoded, total, complete: encoded === total };
-  });
 
-  const filtered = sectionData.filter(
+  useEffect(() => {
+    async function init() {
+      try {
+        const years = await getSchoolYears();
+        setSchoolYears(years);
+        const activeYear = years.find((y) => y.isActive) || years[0];
+        if (activeYear) setSchoolYearId(String(activeYear.id));
+      } catch (error) {
+        console.error("Failed to load school years", error);
+      }
+    }
+    init();
+  }, []);
+
+  useEffect(() => {
+    if (!schoolYearId) return;
+    getSections(Number(schoolYearId)).then(setSections).catch(console.error);
+  }, [schoolYearId]);
+
+  const filtered = sections.filter(
     (s) => gradeFilter === "all" || String(s.gradeLevel) === gradeFilter
   );
 
-  const completeCount = filtered.filter((s) => s.complete).length;
+  // For now, mockup some progress stats since the backend doesn't provide them yet
+  const sectionData = filtered.map((s) => {
+    const total = s.enrolledCount || 0;
+    const encoded = Math.floor(total * (0.7 + Math.random() * 0.3)); // Placeholder progress
+    return { ...s, encoded, total, complete: encoded === total && total > 0 };
+  });
+
+  const completeCount = sectionData.filter((s) => s.complete).length;
+  const currentYearLabel = schoolYears.find(y => String(y.id) === schoolYearId)?.label || "---";
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -72,18 +97,18 @@ export default function GradeEncodingHome() {
                 Active Period
               </p>
               <p className="text-white text-lg font-black">
-                S.Y. {schoolYear} — Quarter {quarter}
+                S.Y. {currentYearLabel} — Quarter {quarter}
               </p>
               <p className="text-teal-200 text-sm mt-0.5">
-                {completeCount}/{filtered.length} sections fully encoded
+                {completeCount}/{sectionData.length} sections fully encoded
               </p>
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-teal-200 text-xs">Completion</p>
                 <p className="text-white text-2xl font-black">
-                  {filtered.length > 0
-                    ? Math.round((completeCount / filtered.length) * 100)
+                  {sectionData.length > 0
+                    ? Math.round((completeCount / sectionData.length) * 100)
                     : 0}%
                 </p>
               </div>
@@ -95,13 +120,14 @@ export default function GradeEncodingHome() {
 
           {/* Filters */}
           <div className="flex items-center gap-2 flex-wrap">
-            <Select value={schoolYear} onValueChange={setSchoolYear}>
-              <SelectTrigger className="h-8 w-32 text-xs border-slate-200 bg-white">
-                <SelectValue />
+            <Select value={schoolYearId} onValueChange={setSchoolYearId}>
+              <SelectTrigger className="h-8 w-40 text-xs border-slate-200 bg-white">
+                <SelectValue placeholder="School Year" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="2025-2026">2025–2026</SelectItem>
-                <SelectItem value="2024-2025">2024–2025</SelectItem>
+                {schoolYears.map((y) => (
+                  <SelectItem key={y.id} value={String(y.id)}>{y.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={quarter} onValueChange={setQuarter}>
@@ -129,9 +155,9 @@ export default function GradeEncodingHome() {
 
           {/* Section Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            {filtered.map((sec) => (
+            {sectionData.map((sec) => (
               <Card
-                key={sec.name}
+                key={sec.id}
                 className="border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
                 onClick={() => navigate(ROUTES.grades.classSheet(sec.name))}
               >

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronRight, Save, X, Edit2, Check, AlertCircle, User,
@@ -11,26 +11,133 @@ import {
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Sidebar from "@/components/sidebar";
-import { SUBJECTS, SECTIONS, MOCK_STUDENTS, computeAvg, gradeColor } from "./MockData";
+import { computeAvg, gradeColor } from "@/utils/gradeUtils";
 import { ROUTES } from "@/routes";
+import {
+  getSections, getSchoolYears, getSubjects, getClassGradeSheet, saveClassGrades,
+} from "@/services/api";
+import type { Section, SchoolYear, Subject, StudentGrade as ApiStudentGrade } from "@/services/api";
 import type { StudentGrade } from "../types";
 
 export default function ClassGradeSheet() {
   const navigate = useNavigate();
   const { sectionId } = useParams<{ sectionId: string }>();
 
+  const [schoolYears,  setSchoolYears]  = useState<SchoolYear[]>([]);
+  const [sections,     setSections]     = useState<Section[]>([]);
+  const [subjects,     setSubjects]     = useState<Subject[]>([]);
+
   const [section,    setSection]    = useState(sectionId ?? "Diligence");
   const [gradeLevel, setGradeLevel] = useState("8");
   const [quarter,    setQuarter]    = useState("1");
-  const [schoolYear, setSchoolYear] = useState("2025-2026");
+  const [schoolYear, setSchoolYear] = useState("");
 
-  const [students,     setStudents]     = useState<StudentGrade[]>(MOCK_STUDENTS);
+  const [students,     setStudents]     = useState<StudentGrade[]>([]);
   const [editingCell,  setEditingCell]  = useState<{ studentId: number; code: string } | null>(null);
   const [editValue,    setEditValue]    = useState("");
   const [editingRow,   setEditingRow]   = useState<number | null>(null);
   const [rowEdits,     setRowEdits]     = useState<Record<string, string>>({});
   const [hasUnsaved,   setHasUnsaved]   = useState(false);
+  const [loading,      setLoading]      = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Initial load
+  useEffect(() => {
+    async function init() {
+      try {
+        const [years, subjs] = await Promise.all([getSchoolYears(), getSubjects()]);
+        setSchoolYears(years);
+        setSubjects(subjs);
+        const activeYear = years.find(y => y.isActive) || years[0];
+        if (activeYear) setSchoolYear(activeYear.label);
+      } catch (err) {
+        console.error("Init failed", err);
+      }
+    }
+    init();
+  }, []);
+
+  // Fetch sections based on school year
+  useEffect(() => {
+    if (!schoolYear) return;
+    const yearId = schoolYears.find(y => y.label === schoolYear)?.id;
+    if (yearId) {
+      getSections(yearId).then((secs) => {
+        setSections(secs);
+        // If the current section is not in the list, default to first
+        if (sectionId && !secs.find(s => s.name === sectionId)) {
+           // Maybe don't auto-reset if we came from a specific URL
+        }
+      });
+    }
+  }, [schoolYear, schoolYears]);
+
+  // Main data fetch
+  useEffect(() => {
+    if (!section || !schoolYear || !quarter) return;
+    async function fetchData() {
+      setLoading(true);
+      try {
+        const rawGrades: ApiStudentGrade[] = await getClassGradeSheet(section, schoolYear, Number(quarter));
+
+        // Group by student
+        const grouped: Record<number, StudentGrade> = {};
+        rawGrades.forEach(g => {
+          if (!grouped[g.studentId]) {
+            grouped[g.studentId] = {
+              studentId: g.studentId,
+              lrn: g.lrn,
+              name: g.fullName,
+              grades: {}
+            };
+          }
+          // The component expects a map of subjectCode -> grade
+          // We find the subject via its name or ID if subjectCode isn't in ApiStudentGrade
+          // Assuming subjectName corresponds to a code we can find
+          const match = subjects.find(s => s.name === g.subjectName || s.id === g.subjectId);
+          if (match) {
+            const field = `q${quarter}Grade` as keyof ApiStudentGrade;
+            grouped[g.studentId].grades[match.code] = (g[field] as number) ?? null;
+          }
+        });
+        setStudents(Object.values(grouped));
+      } catch (err) {
+        console.error("Fetch failed", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [section, schoolYear, quarter, subjects]);
+
+  const handleSaveAll = async () => {
+    try {
+      // Map current students back to the format saveClassGrades expects
+      const payload = students.flatMap(s => {
+        return Object.entries(s.grades).map(([code, grade]) => {
+          const subj = subjects.find(sub => sub.code === code);
+          const secObj = sections.find(sec => sec.name === section);
+          const syObj = schoolYears.find(sy => sy.label === schoolYear);
+
+          if (!subj || !secObj || !syObj || grade === null) return null;
+
+          return {
+            studentId: s.studentId,
+            subjectId: subj.id,
+            sectionId: secObj.id,
+            schoolYearId: syObj.id,
+            quarter: quarter,
+            grade: grade
+          };
+        }).filter(x => x !== null);
+      }) as any[];
+
+      await saveClassGrades(payload);
+      setHasUnsaved(false);
+    } catch (err) {
+      console.error("Save failed", err);
+    }
+  };
 
   function startCellEdit(studentId: number, code: string, current: number | null) {
     setEditingCell({ studentId, code });
@@ -60,12 +167,14 @@ export default function ClassGradeSheet() {
   function startRowEdit(studentId: number, grades: Record<string, number | null>) {
     setEditingRow(studentId);
     const edits: Record<string, string> = {};
-    SUBJECTS.forEach((s) => {
+    subjects.forEach((s: Subject) => {
       edits[s.code] = grades[s.code] === null ? "" : String(grades[s.code]);
     });
     setRowEdits(edits);
     setEditingCell(null);
   }
+
+  const SUBJECTS_LIST = subjects.length > 0 ? subjects : [];
 
   function commitRowEdit() {
     if (editingRow === null) return;
@@ -122,12 +231,21 @@ export default function ClassGradeSheet() {
             <Button
               size="sm"
               className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
-              onClick={() => setHasUnsaved(false)}
+              onClick={handleSaveAll}
             >
               <Save className="w-3.5 h-3.5" /> Save All
             </Button>
           </div>
         </header>
+
+        {loading && (
+          <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-50 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs font-bold text-teal-700">Loading Grades...</p>
+            </div>
+          </div>
+        )}
 
         <div className="p-6 space-y-4">
           {/* Title row */}
@@ -151,10 +269,11 @@ export default function ClassGradeSheet() {
           {/* Filters */}
           <div className="flex items-center gap-2 flex-wrap">
             <Select value={schoolYear} onValueChange={setSchoolYear}>
-              <SelectTrigger className="h-8 w-32 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-40 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="2025-2026">2025–2026</SelectItem>
-                <SelectItem value="2024-2025">2024–2025</SelectItem>
+                {schoolYears.map((sy) => (
+                  <SelectItem key={sy.id} value={sy.label}>{sy.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={gradeLevel} onValueChange={setGradeLevel}>
@@ -168,8 +287,8 @@ export default function ClassGradeSheet() {
             <Select value={section} onValueChange={setSection}>
               <SelectTrigger className="h-8 w-36 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {SECTIONS.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                {sections.map((s) => (
+                  <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -192,7 +311,7 @@ export default function ClassGradeSheet() {
                     <th className="sticky left-0 bg-slate-50 px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 w-48 z-10 border-r border-slate-200">
                       Student
                     </th>
-                    {SUBJECTS.map((s) => (
+                    {SUBJECTS_LIST.map((s) => (
                       <th key={s.code} className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 min-w-[60px]">
                         {s.code}
                       </th>
@@ -231,7 +350,7 @@ export default function ClassGradeSheet() {
                         </td>
 
                         {/* Grade cells */}
-                        {SUBJECTS.map((subj) => {
+                        {SUBJECTS_LIST.map((subj) => {
                           const isCellEditing =
                             editingCell?.studentId === student.studentId &&
                             editingCell.code === subj.code;
@@ -332,7 +451,7 @@ export default function ClassGradeSheet() {
                         Class Average
                       </p>
                     </td>
-                    {SUBJECTS.map((subj) => {
+                    {SUBJECTS_LIST.map((subj: Subject) => {
                       const vals = students
                         .map((s) => s.grades[subj.code])
                         .filter((v): v is number => v !== null);

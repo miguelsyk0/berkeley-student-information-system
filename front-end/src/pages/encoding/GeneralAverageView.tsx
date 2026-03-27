@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,28 +8,72 @@ import {
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Sidebar from "@/components/sidebar";
-import { SUBJECTS, SECTIONS, MOCK_STUDENTS, GRADE_COLORS, computeAvg, gradeColor, letterGrade } from "./MockData";
+import { gradeColor, letterGrade } from "@/utils/gradeUtils";
 import { ROUTES } from "@/routes";
+import { getSchoolYears, getSections, getGeneralAverage, getSubjects } from "@/services/api";
+import type { SchoolYear, Section, GeneralAverage, Subject } from "@/services/api";
 
 export default function GeneralAverageView() {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<"section" | "student">("section");
-  const [section,  setSection]  = useState("Diligence");
-  const [quarter,  setQuarter]  = useState("all");
 
-  const ranked = MOCK_STUDENTS
-    .map((s) => ({ ...s, avg: computeAvg(s.grades), letter: letterGrade(computeAvg(s.grades)) }))
-    .sort((a, b) => (b.avg ?? 0) - (a.avg ?? 0));
+  const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [averages, setAverages] = useState<GeneralAverage[]>([]);
 
-  const withAvg    = ranked.filter((s) => s.avg !== null);
-  const classAvg   = withAvg.reduce((sum, s) => sum + (s.avg ?? 0), 0) / (withAvg.length || 1);
-  const passing    = ranked.filter((s) => (s.avg ?? 0) >= 75).length;
+  const [schoolYear, setSchoolYear] = useState("");
+  const [section, setSection] = useState("Diligence");
+  const [quarter, setQuarter] = useState("all");
+
+  useEffect(() => {
+    async function init() {
+      try {
+        const [years, subjs] = await Promise.all([getSchoolYears(), getSubjects()]);
+        setSchoolYears(years);
+        setSubjects(subjs);
+        const active = years.find(y => y.isActive) || years[0];
+        if (active) setSchoolYear(active.label);
+      } catch (err) {
+        console.error("Init failed", err);
+      }
+    }
+    init();
+  }, []);
+
+  useEffect(() => {
+    if (!schoolYear) return;
+    const yId = schoolYears.find(y => y.label === schoolYear)?.id;
+    if (yId) {
+      getSections(yId).then(setSections).catch(console.error);
+    }
+  }, [schoolYear, schoolYears]);
+
+  useEffect(() => {
+    if (!section || !schoolYear) return;
+    getGeneralAverage(section, quarter === "all" ? undefined : quarter)
+      .then(setAverages)
+      .catch(console.error);
+  }, [section, quarter, schoolYear]);
+
+  const ranked = averages
+    .sort((a, b) => b.generalAverage - a.generalAverage)
+    .map(a => ({
+      ...a,
+      avg: a.generalAverage,
+      letter: letterGrade(a.generalAverage)
+    }));
+
+  const classAvg = averages.length > 0
+    ? averages.reduce((sum, s) => sum + s.generalAverage, 0) / averages.length
+    : 0;
+  const passing = averages.filter((s) => s.generalAverage >= 75).length;
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <Sidebar
         user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }}
-        onLogout={() => {}}
+        onLogout={() => { }}
       />
 
       <main className="flex-1 overflow-y-auto">
@@ -56,9 +100,8 @@ export default function GeneralAverageView() {
                 <button
                   key={m}
                   onClick={() => setViewMode(m)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
-                    viewMode === m ? "bg-teal-600 text-white" : "text-slate-500 hover:bg-slate-50"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${viewMode === m ? "bg-teal-600 text-white" : "text-slate-500 hover:bg-slate-50"
+                    }`}
                 >
                   By {m}
                 </button>
@@ -68,10 +111,16 @@ export default function GeneralAverageView() {
 
           {/* Filters */}
           <div className="flex items-center gap-2">
+            <Select value={schoolYear} onValueChange={setSchoolYear}>
+              <SelectTrigger className="h-8 w-40 text-xs border-slate-200 bg-white"><SelectValue placeholder="Year" /></SelectTrigger>
+              <SelectContent>
+                {schoolYears.map(y => <SelectItem key={y.id} value={y.label}>{y.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Select value={section} onValueChange={setSection}>
               <SelectTrigger className="h-8 w-36 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {SECTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {sections.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={quarter} onValueChange={setQuarter}>
@@ -88,10 +137,10 @@ export default function GeneralAverageView() {
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-3">
             {[
-              { label: "Class Average", value: classAvg.toFixed(2),                      color: "text-teal-700",    bg: "bg-teal-50"   },
-              { label: "Highest",       value: ranked[0]?.avg?.toFixed(2) ?? "—",         color: "text-emerald-700", bg: "bg-emerald-50" },
-              { label: "Lowest",        value: ranked[ranked.length - 1]?.avg?.toFixed(2) ?? "—", color: "text-red-600", bg: "bg-red-50" },
-              { label: "Passing",       value: `${passing}/${ranked.length}`,              color: "text-slate-700",   bg: "bg-white"     },
+              { label: "Class Average", value: classAvg.toFixed(2), color: "text-teal-700", bg: "bg-teal-50" },
+              { label: "Highest", value: ranked[0]?.avg?.toFixed(2) ?? "—", color: "text-emerald-700", bg: "bg-emerald-50" },
+              { label: "Lowest", value: ranked[ranked.length - 1]?.avg?.toFixed(2) ?? "—", color: "text-red-600", bg: "bg-red-50" },
+              { label: "Passing", value: `${passing}/${ranked.length}`, color: "text-slate-700", bg: "bg-white" },
             ].map(({ label, value, color, bg }) => (
               <Card key={label} className={`border-0 shadow-sm ${bg}`}>
                 <CardContent className="px-4 py-3.5 text-center">
@@ -115,7 +164,7 @@ export default function GeneralAverageView() {
                   <tr className="border-b border-slate-100">
                     <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Rank</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Student</th>
-                    {SUBJECTS.map((s) => (
+                    {subjects.map((s) => (
                       <th key={s.code} className="px-2 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
                         {s.code}
                       </th>
@@ -128,17 +177,15 @@ export default function GeneralAverageView() {
                   {ranked.map((s, rank) => (
                     <tr
                       key={s.studentId}
-                      className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 ${
-                        rank === 0 ? "bg-amber-50/50" :
+                      className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 ${rank === 0 ? "bg-amber-50/50" :
                         rank === 1 ? "bg-slate-50/80" : ""
-                      }`}
+                        }`}
                     >
                       <td className="px-5 py-3">
-                        <span className={`text-xs font-black ${
-                          rank === 0 ? "text-amber-600" :
+                        <span className={`text-xs font-black ${rank === 0 ? "text-amber-600" :
                           rank === 1 ? "text-slate-500" :
-                          rank === 2 ? "text-amber-800" : "text-slate-400"
-                        }`}>
+                            rank === 2 ? "text-amber-800" : "text-slate-400"
+                          }`}>
                           #{rank + 1}
                         </span>
                       </td>
@@ -146,18 +193,15 @@ export default function GeneralAverageView() {
                         <div className="flex items-center gap-2">
                           <Avatar className="w-6 h-6">
                             <AvatarFallback className="bg-slate-100 text-slate-600 text-[9px] font-bold">
-                              {s.name.split(",")[0]?.[0]}
-                              {s.name.split(" ").slice(-1)[0]?.[0]}
+                              {s.fullName?.[0]}
                             </AvatarFallback>
                           </Avatar>
-                          <p className="text-xs font-semibold text-slate-700">{s.name}</p>
+                          <p className="text-xs font-semibold text-slate-700">{s.fullName}</p>
                         </div>
                       </td>
-                      {SUBJECTS.map((subj) => (
+                      {subjects.map((subj) => (
                         <td key={subj.code} className="px-2 py-3 text-center">
-                          <span className={`text-xs ${gradeColor(s.grades[subj.code])}`}>
-                            {s.grades[subj.code] ?? "—"}
-                          </span>
+                          <span className="text-xs text-slate-300">—</span>
                         </td>
                       ))}
                       <td className="px-4 py-3 text-center">

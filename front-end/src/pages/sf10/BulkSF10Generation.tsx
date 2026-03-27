@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronRight, FileDown, Download, CheckCircle2, RefreshCw, Users,
@@ -11,33 +11,57 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import Sidebar from "@/components/sidebar";
-import { SECTIONS, MOCK_STUDENTS } from "../encoding/MockData";
 import { ROUTES } from "@/routes";
+import { getSections, getSchoolYears, getStudents } from "@/services/api";
+import type { Section, SchoolYear, Student } from "@/services/api";
 
 export default function BulkSF10Generation() {
   const navigate = useNavigate();
 
+  const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+
   const [section,    setSection]    = useState("Diligence");
   const [gradeLevel, setGradeLevel] = useState("8");
-  const [schoolYear, setSchoolYear] = useState("2025-2026");
+  const [schoolYear, setSchoolYear] = useState("");
   const [generating, setGenerating] = useState(false);
   const [progress,   setProgress]   = useState(0);
   const [done,       setDone]       = useState(false);
   const [currentStudent, setCurrentStudent] = useState("");
 
+  useEffect(() => {
+    getSchoolYears().then((years) => {
+      setSchoolYears(years);
+      const active = years.find(y => y.isActive) || years[0];
+      if (active) setSchoolYear(active.label);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!schoolYear) return;
+    const yId = schoolYears.find(y => y.label === schoolYear)?.id;
+    if (yId) getSections(yId).then(setSections);
+  }, [schoolYear, schoolYears]);
+
+  useEffect(() => {
+    if (!section) return;
+    getStudents({ section }).then(setStudents);
+  }, [section]);
+
   function startGeneration() {
+    if (students.length === 0) return;
     setGenerating(true);
     setProgress(0);
     setDone(false);
 
-    const names = MOCK_STUDENTS.map((s) => s.name);
     let i = 0;
-
     const interval = setInterval(() => {
       i++;
-      setProgress(Math.round((i / names.length) * 100));
-      setCurrentStudent(names[i - 1] ?? "");
-      if (i >= names.length) {
+      setProgress(Math.round((i / students.length) * 100));
+      const s = students[i-1];
+      setCurrentStudent(s ? `${s.lastName}, ${s.firstName}` : "");
+      if (i >= students.length) {
         clearInterval(interval);
         setTimeout(() => {
           setGenerating(false);
@@ -95,8 +119,9 @@ export default function BulkSF10Generation() {
                 <Select value={schoolYear} onValueChange={setSchoolYear} disabled={generating}>
                   <SelectTrigger className="h-9 text-sm border-slate-200"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="2025-2026">2025–2026</SelectItem>
-                    <SelectItem value="2024-2025">2024–2025</SelectItem>
+                    {schoolYears.map(y => (
+                      <SelectItem key={y.id} value={y.label}>{y.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -116,8 +141,8 @@ export default function BulkSF10Generation() {
                 <Select value={section} onValueChange={setSection} disabled={generating}>
                   <SelectTrigger className="h-9 text-sm border-slate-200"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {SECTIONS.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    {sections.map((s) => (
+                      <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -132,14 +157,14 @@ export default function BulkSF10Generation() {
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-black text-slate-700">Students to Generate</p>
                   <Badge className="bg-teal-100 text-teal-700 border-0 text-[10px]">
-                    {MOCK_STUDENTS.length} students
+                    {students.length} students
                   </Badge>
                 </div>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                  {MOCK_STUDENTS.map((s, i) => (
-                    <div key={s.studentId} className="flex items-center gap-2.5 py-1">
+                  {students.map((s, i) => (
+                    <div key={s.id} className="flex items-center gap-2.5 py-1">
                       <span className="text-[10px] text-slate-400 w-5 text-right">{i + 1}.</span>
-                      <p className="text-xs font-semibold text-slate-700">{s.name}</p>
+                      <p className="text-xs font-semibold text-slate-700">{s.lastName}, {s.firstName}</p>
                       <span className="text-[10px] font-mono text-slate-400 ml-auto">{s.lrn}</span>
                     </div>
                   ))}
@@ -158,7 +183,7 @@ export default function BulkSF10Generation() {
                 <div className="text-center">
                   <p className="text-sm font-black text-slate-700">Generating SF10 PDFs...</p>
                   <p className="text-xs text-slate-400 mt-1">
-                    {Math.round((progress / 100) * MOCK_STUDENTS.length)}/{MOCK_STUDENTS.length} students complete
+                    {Math.round((progress / 100) * students.length)}/{students.length} students complete
                   </p>
                   {currentStudent && (
                     <p className="text-xs text-teal-600 font-semibold mt-1">
@@ -184,7 +209,7 @@ export default function BulkSF10Generation() {
                 <div className="text-center">
                   <p className="text-sm font-black text-emerald-800">Generation Complete!</p>
                   <p className="text-xs text-emerald-600 mt-1">
-                    {MOCK_STUDENTS.length} SF10 PDFs ready for download.
+                    {students.length} SF10 PDFs ready for download.
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -209,7 +234,7 @@ export default function BulkSF10Generation() {
               className="h-9 px-6 text-sm font-semibold gap-2 bg-teal-600 hover:bg-teal-800"
               onClick={startGeneration}
             >
-              <FileDown className="w-4 h-4" /> Generate {MOCK_STUDENTS.length} SF10 PDFs
+              <FileDown className="w-4 h-4" /> Generate {students.length} SF10 PDFs
             </Button>
           )}
         </div>

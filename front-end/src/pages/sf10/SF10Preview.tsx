@@ -1,8 +1,7 @@
-import { useRef } from "react";
-import { SUBJECTS, QUARTERLY_MOCK, computeAvg } from "../encoding/MockData";
-import type { StudentGrade } from "../types";
-
-// ─── PDF Export ────────────────────────────────────────────────────────────────
+import { useState, useEffect, useRef } from "react";
+import { useParams } from "react-router-dom";
+import { getStudentDetails, getSubjects } from "@/services/api";
+import type { Student, Subject } from "@/services/api";
 
 async function exportToPDF(elementId: string, filename: string) {
   const { default: html2canvas } = await import("html2canvas");
@@ -274,23 +273,22 @@ function ScholasticBlock({ record }: { record: ScholasticRecord }) {
 
 // ─── Build mock records from existing mock data ────────────────────────────────
 
-function buildGradesFromMock(): Record<string, GradeEntry> {
+function buildGradesFromMock(subjects: Subject[]): Record<string, GradeEntry> {
   const grades: Record<string, GradeEntry> = {};
-  for (const subj of SUBJECTS) {
-    const qData = QUARTERLY_MOCK[subj.code] ?? {};
+  for (const subj of subjects) {
     grades[subj.code] = {
-      q1: qData[1] ?? null,
-      q2: qData[2] ?? null,
-      q3: qData[3] ?? null,
-      q4: qData[4] ?? null,
+      q1: 85,
+      q2: 88,
+      q3: 90,
+      q4: 92,
     };
   }
   return grades;
 }
 
-function buildPriorGrades(): Record<string, GradeEntry> {
+function buildPriorGrades(subjects: Subject[]): Record<string, GradeEntry> {
   const grades: Record<string, GradeEntry> = {};
-  for (const subj of SUBJECTS) {
+  for (const subj of subjects) {
     grades[subj.code] = {
       q1: Math.round(78 + Math.random() * 18),
       q2: Math.round(78 + Math.random() * 18),
@@ -303,7 +301,7 @@ function buildPriorGrades(): Record<string, GradeEntry> {
 
 // ─── Front Page ────────────────────────────────────────────────────────────────
 
-export function SF10FrontPage({ student }: { student: StudentGrade }) {
+export function SF10FrontPage({ student, subjects }: { student: any; subjects: Subject[] }) {
   const nameParts = student.name.split(",");
   const lastName  = nameParts[0]?.trim() ?? "";
   const firstRest = nameParts[1]?.trim().split(" ") ?? [];
@@ -320,7 +318,7 @@ export function SF10FrontPage({ student }: { student: StudentGrade }) {
     section:     "Rizal",
     schoolYear:  "2025–2026",
     adviser:     "R. Dela Cruz",
-    grades:      buildGradesFromMock(),
+    grades:      buildGradesFromMock(subjects),
   };
 
   const grade7Record: ScholasticRecord = {
@@ -329,7 +327,7 @@ export function SF10FrontPage({ student }: { student: StudentGrade }) {
     section:    "Bonifacio",
     schoolYear: "2024–2025",
     adviser:    "M. Santos",
-    grades:     buildPriorGrades(),
+    grades:     buildPriorGrades(subjects),
   };
 
   return (
@@ -476,7 +474,7 @@ export function SF10FrontPage({ student }: { student: StudentGrade }) {
 
 // ─── Back Page ─────────────────────────────────────────────────────────────────
 
-export function SF10BackPage({ student }: { student: StudentGrade }) {
+export function SF10BackPage({ student }: { student: any }) {
   const grade9Record: ScholasticRecord = {
     school:     "DepEd JHS Model School",
     schoolId:   "301028",
@@ -581,11 +579,50 @@ export function SF10BackPage({ student }: { student: StudentGrade }) {
 
 // ─── Full Preview with Export Button ──────────────────────────────────────────
 
-export function SF10Preview({ student }: { student: StudentGrade }) {
+export function SF10Preview() {
+  const { studentId } = useParams<{ studentId: string }>();
+  const [student, setStudent] = useState<Student | null>(null);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [loading, setLoading] = useState(true);
   const printRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (!studentId) return;
+    async function load() {
+      setLoading(true);
+      try {
+        const [det, subjs] = await Promise.all([
+          getStudentDetails(Number(studentId)),
+          getSubjects()
+        ]);
+        setStudent(det);
+        setSubjects(subjs);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [studentId]);
+
   const handleExport = async () => {
-    await exportToPDF("sf10-print-area", `SF10_${student.lrn}_${student.name.replace(/[^a-zA-Z]/g, "_")}.pdf`);
+    if (!student) return;
+    const nameStr = `${student.lastName}_${student.firstName}`.replace(/[^a-zA-Z]/g, "_");
+    await exportToPDF("sf10-print-area", `SF10_${student.lrn}_${nameStr}.pdf`);
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen bg-slate-50">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+    </div>
+  );
+
+  if (!student) return <div className="p-10 text-center">Student not found</div>;
+
+  const stuGrade: any = {
+    name: `${student.lastName}, ${student.firstName}`,
+    lrn: student.lrn
   };
 
   return (
@@ -630,12 +667,12 @@ export function SF10Preview({ student }: { student: StudentGrade }) {
       >
         {/* Page 1 – Front */}
         <div className="shadow-md print:shadow-none">
-          <SF10FrontPage student={student} />
+          <SF10FrontPage student={stuGrade} subjects={subjects} />
         </div>
 
         {/* Page 2 – Back */}
         <div className="shadow-md print:shadow-none print:break-before-page">
-          <SF10BackPage student={student} />
+          <SF10BackPage student={stuGrade} />
         </div>
       </div>
 

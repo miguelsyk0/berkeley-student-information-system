@@ -17,7 +17,6 @@ import {
   Plus,
   FileSpreadsheet,
   ChevronRight,
-  GraduationCap,
   TrendingUp,
   Bell,
   Search,
@@ -30,7 +29,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import {
@@ -62,18 +60,6 @@ const gradeDistribution = [
   { label: "D", count: 12, color: "#ef4444" },
 ];
 
-const subjectAverages = [
-  { subject: "Logical Analysis", avg: 88.4 },
-  { subject: "Science Lab", avg: 87.1 },
-  { subject: "Math Lab", avg: 85.9 },
-  { subject: "Social Literacy", avg: 89.2 },
-  { subject: "English Lab", avg: 88.7 },
-  { subject: "Wika", avg: 87.5 },
-  { subject: "Psychomotor", avg: 90.1 },
-  { subject: "TLE", avg: 91.3 },
-  { subject: "MSE", avg: 86.8 },
-  { subject: "Coding", avg: 88.9 },
-];
 
 const importCompletion = [
   { section: "7 - Integrity", grade: 7, done: true, progress: 100 },
