@@ -1,21 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Building2, MapPin, Hash, Globe, Pencil, Save, X, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Sidebar from "@/components/sidebar";
-
-// ── Mock Data ──────────────────────────────────────────────────────────────────
-
-const initialSchool = {
-  name: "Berkeley School Inc.",
-  schoolId: "481504",
-  district: "District X",
-  division: "Baguio City",
-  region: "CAR",
-  address: "30 C.M. Recto St, Baguio, 2600 Benguet",
-};
+import { getSchoolProfile, updateSchoolProfile, type School } from "@/services/api";
 
 // ── Field Row ──────────────────────────────────────────────────────────────────
 
@@ -30,8 +20,8 @@ function FieldRow({
   label: string;
   value: string;
   editing: boolean;
-  name: string;
-  onChange: (name: string, val: string) => void;
+  name: keyof School;
+  onChange: (name: keyof School, val: string) => void;
   icon: React.ElementType;
 }) {
   return (
@@ -58,22 +48,85 @@ function FieldRow({
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function SchoolProfile() {
-  const [school, setSchool] = useState(initialSchool);
-  const [draft, setDraft] = useState(initialSchool);
+  const [school, setSchool] = useState<School | null>(null);
+  const [draft, setDraft] = useState<Partial<School>>({});
   const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  function handleChange(name: string, value: string) {
+  useEffect(() => {
+    loadSchoolProfile();
+  }, []);
+
+  async function loadSchoolProfile() {
+    try {
+      const data = await getSchoolProfile();
+      setSchool(data);
+      setDraft(data);
+    } catch (error) {
+      console.error("Failed to load school profile:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleChange(name: keyof School, value: string) {
     setDraft((prev) => ({ ...prev, [name]: value }));
   }
 
-  function handleSave() {
-    setSchool(draft);
-    setEditing(false);
+  async function handleSave() {
+    if (!school) return;
+
+    setSaving(true);
+    try {
+      await updateSchoolProfile(draft);
+      setSchool(draft as School);
+      setEditing(false);
+    } catch (error) {
+      console.error("Failed to save school profile:", error);
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleCancel() {
-    setDraft(school);
+    if (school) {
+      setDraft(school);
+    }
     setEditing(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-slate-50 overflow-hidden">
+        <Sidebar
+          user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }}
+          onLogout={() => console.log("Logout")}
+        />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto"></div>
+            <p className="text-sm text-slate-500 mt-2">Loading school profile...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!school) {
+    return (
+      <div className="flex h-screen bg-slate-50 overflow-hidden">
+        <Sidebar
+          user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }}
+          onLogout={() => console.log("Logout")}
+        />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-slate-500">Failed to load school profile</p>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -92,11 +145,11 @@ export default function SchoolProfile() {
           <div className="ml-auto flex gap-2">
             {editing ? (
               <>
-                <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={handleCancel}>
+                <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={handleCancel} disabled={saving}>
                   <X className="w-3.5 h-3.5" /> Cancel
                 </Button>
-                <Button size="sm" className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800" onClick={handleSave}>
-                  <Save className="w-3.5 h-3.5" /> Save Changes
+                <Button size="sm" className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800" onClick={handleSave} disabled={saving}>
+                  <Save className="w-3.5 h-3.5" /> {saving ? "Saving..." : "Save Changes"}
                 </Button>
               </>
             ) : (
@@ -130,12 +183,11 @@ export default function SchoolProfile() {
             </CardHeader>
 
             <CardContent className="px-6 pb-6 divide-y divide-slate-100">
-              <FieldRow label="School Name" value={draft.name} name="name" editing={editing} onChange={handleChange} icon={Building2} />
-              <FieldRow label="DepEd School ID" value={draft.schoolId} name="schoolId" editing={editing} onChange={handleChange} icon={Hash} />
-              <FieldRow label="District" value={draft.district} name="district" editing={editing} onChange={handleChange} icon={MapPin} />
-              <FieldRow label="Division" value={draft.division} name="division" editing={editing} onChange={handleChange} icon={MapPin} />
-              <FieldRow label="Region" value={draft.region} name="region" editing={editing} onChange={handleChange} icon={Globe} />
-              <FieldRow label="Complete Address" value={draft.address} name="address" editing={editing} onChange={handleChange} icon={MapPin} />
+              <FieldRow label="School Name" value={draft.name || ''} name="name" editing={editing} onChange={handleChange} icon={Building2} />
+              <FieldRow label="District" value={draft.district || ''} name="district" editing={editing} onChange={handleChange} icon={MapPin} />
+              <FieldRow label="Division" value={draft.division || ''} name="division" editing={editing} onChange={handleChange} icon={MapPin} />
+              <FieldRow label="Region" value={draft.region || ''} name="region" editing={editing} onChange={handleChange} icon={Globe} />
+              <FieldRow label="Complete Address" value={draft.address || ''} name="address" editing={editing} onChange={handleChange} icon={MapPin} />
             </CardContent>
           </Card>
 

@@ -1,0 +1,126 @@
+extend type AcademicRecord {
+  """
+  ✨ Implicit foreign key field based on `AcademicRecord`.`enrollment`. It must match the value of `Enrollment`.`id`. See `@ref` for how to customize it.
+  """
+  enrollmentId: UUID! @fdc_generated(from: "AcademicRecord.enrollment", purpose: IMPLICIT_REF_FIELD)
+}
+extend type ColumnMapping {
+  """
+  ✨ Implicit foreign key field based on `ColumnMapping`.`importLog`. It must match the value of `ImportLog`.`id`. See `@ref` for how to customize it.
+  """
+  importLogId: UUID! @fdc_generated(from: "ColumnMapping.importLog", purpose: IMPLICIT_REF_FIELD)
+}
+extend type Enrollment {
+  """
+  ✨ Implicit foreign key field based on `Enrollment`.`schoolYear`. It must match the value of `SchoolYear`.`id`. See `@ref` for how to customize it.
+  """
+  schoolYearId: UUID! @fdc_generated(from: "Enrollment.schoolYear", purpose: IMPLICIT_REF_FIELD)
+  """
+  ✨ Implicit foreign key field based on `Enrollment`.`section`. It must match the value of `Section`.`id`. See `@ref` for how to customize it.
+  """
+  sectionId: UUID! @fdc_generated(from: "Enrollment.section", purpose: IMPLICIT_REF_FIELD)
+  """
+  ✨ Implicit foreign key field based on `Enrollment`.`student`. It must match the value of `Student`.`id`. See `@ref` for how to customize it.
+  """
+  studentId: UUID! @fdc_generated(from: "Enrollment.student", purpose: IMPLICIT_REF_FIELD)
+}
+extend type ImportLog {
+  """
+  ✨ Implicit foreign key field based on `ImportLog`.`importedBy`. It must match the value of `User`.`id`. See `@ref` for how to customize it.
+  """
+  importedById: UUID @fdc_generated(from: "ImportLog.importedBy", purpose: IMPLICIT_REF_FIELD)
+  """
+  ✨ Implicit foreign key field based on `ImportLog`.`schoolYear`. It must match the value of `SchoolYear`.`id`. See `@ref` for how to customize it.
+  """
+  schoolYearId: UUID @fdc_generated(from: "ImportLog.schoolYear", purpose: IMPLICIT_REF_FIELD)
+  """
+  ✨ Implicit foreign key field based on `ImportLog`.`section`. It must match the value of `Section`.`id`. See `@ref` for how to customize it.
+  """
+  sectionId: UUID @fdc_generated(from: "ImportLog.section", purpose: IMPLICIT_REF_FIELD)
+}
+extend type ImportPreviewRow {
+  """
+  ✨ Implicit foreign key field based on `ImportPreviewRow`.`importLog`. It must match the value of `ImportLog`.`id`. See `@ref` for how to customize it.
+  """
+  importLogId: UUID! @fdc_generated(from: "ImportPreviewRow.importLog", purpose: IMPLICIT_REF_FIELD)
+}
+extend type Quarter {
+  """
+  ✨ Implicit foreign key field based on `Quarter`.`schoolYear`. It must match the value of `SchoolYear`.`id`. See `@ref` for how to customize it.
+  """
+  schoolYearId: UUID! @fdc_generated(from: "Quarter.schoolYear", purpose: IMPLICIT_REF_FIELD)
+}
+extend type Section {
+  """
+  ✨ Implicit foreign key field based on `Section`.`adviser`. It must match the value of `Teacher`.`id`. See `@ref` for how to customize it.
+  """
+  adviserId: UUID @fdc_generated(from: "Section.adviser", purpose: IMPLICIT_REF_FIELD)
+  """
+  ✨ Implicit foreign key field based on `Section`.`schoolYear`. It must match the value of `SchoolYear`.`id`. See `@ref` for how to customize it.
+  """
+  schoolYearId: UUID! @fdc_generated(from: "Section.schoolYear", purpose: IMPLICIT_REF_FIELD)
+}
+extend type SectionSubject {
+  """
+  ✨ Implicit foreign key field based on `SectionSubject`.`section`. It must match the value of `Section`.`id`. See `@ref` for how to customize it.
+  """
+  sectionId: UUID! @fdc_generated(from: "SectionSubject.section", purpose: IMPLICIT_REF_FIELD)
+  """
+  ✨ Implicit foreign key field based on `SectionSubject`.`subject`. It must match the value of `Subject`.`id`. See `@ref` for how to customize it.
+  """
+  subjectId: UUID! @fdc_generated(from: "SectionSubject.subject", purpose: IMPLICIT_REF_FIELD)
+  """
+  ✨ Implicit foreign key field based on `SectionSubject`.`teacher`. It must match the value of `Teacher`.`id`. See `@ref` for how to customize it.
+  """
+  teacherId: UUID @fdc_generated(from: "SectionSubject.teacher", purpose: IMPLICIT_REF_FIELD)
+}
+extend type Subject {
+  """
+  ✨ Implicit foreign key field based on `Subject`.`mapehParent`. It must match the value of `Subject`.`id`. See `@ref` for how to customize it.
+  """
+  mapehParentId: UUID @fdc_generated(from: "Subject.mapehParent", purpose: IMPLICIT_REF_FIELD)
+}
+extend type SubjectGrade {
+  """
+  ✨ Implicit foreign key field based on `SubjectGrade`.`academicRecord`. It must match the value of `AcademicRecord`.`id`. See `@ref` for how to customize it.
+  """
+  academicRecordId: UUID! @fdc_generated(from: "SubjectGrade.academicRecord", purpose: IMPLICIT_REF_FIELD)
+  """
+  ✨ Implicit foreign key field based on `SubjectGrade`.`subject`. It must match the value of `Subject`.`id`. See `@ref` for how to customize it.
+  """
+  subjectId: UUID! @fdc_generated(from: "SubjectGrade.subject", purpose: IMPLICIT_REF_FIELD)
+}
+extend type Teacher {
+  """
+  ✨ Implicit foreign key field based on `Teacher`.`user`. It must match the value of `User`.`id`. See `@ref` for how to customize it.
+  """
+  userId: UUID @fdc_generated(from: "Teacher.user", purpose: IMPLICIT_REF_FIELD)
+}
+extend type TranscriptHeader {
+  """
+  ✨ Implicit foreign key field based on `TranscriptHeader`.`enrollment`. It must match the value of `Enrollment`.`id`. See `@ref` for how to customize it.
+  """
+  enrollmentId: UUID @fdc_generated(from: "TranscriptHeader.enrollment", purpose: IMPLICIT_REF_FIELD)
+  """
+  ✨ Implicit foreign key field based on `TranscriptHeader`.`student`. It must match the value of `Student`.`id`. See `@ref` for how to customize it.
+  """
+  studentId: UUID! @fdc_generated(from: "TranscriptHeader.student", purpose: IMPLICIT_REF_FIELD)
+}
+extend type TranscriptRemedialRow {
+  """
+  ✨ Implicit foreign key field based on `TranscriptRemedialRow`.`transcriptHeader`. It must match the value of `TranscriptHeader`.`id`. See `@ref` for how to customize it.
+  """
+  transcriptHeaderId: UUID! @fdc_generated(from: "TranscriptRemedialRow.transcriptHeader", purpose: IMPLICIT_REF_FIELD)
+}
+extend type TranscriptSubjectRow {
+  """
+  ✨ Implicit foreign key field based on `TranscriptSubjectRow`.`transcriptHeader`. It must match the value of `TranscriptHeader`.`id`. See `@ref` for how to customize it.
+  """
+  transcriptHeaderId: UUID! @fdc_generated(from: "TranscriptSubjectRow.transcriptHeader", purpose: IMPLICIT_REF_FIELD)
+}
+extend type ValidationError {
+  """
+  ✨ Implicit foreign key field based on `ValidationError`.`importLog`. It must match the value of `ImportLog`.`id`. See `@ref` for how to customize it.
+  """
+  importLogId: UUID! @fdc_generated(from: "ValidationError.importLog", purpose: IMPLICIT_REF_FIELD)
+}

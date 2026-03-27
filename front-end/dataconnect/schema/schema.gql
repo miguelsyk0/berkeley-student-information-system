@@ -1,0 +1,329 @@
+# ============================================================
+# Berkeley School System — GraphQL Schema
+# Firebase Data Connect compatible (schema.graphql)
+# Relationships use typed foreign key fields — no custom directives
+# ============================================================
+
+# -------------------
+# Enums
+# -------------------
+
+# GenderType is intentionally kept as String instead of an enum.
+# Firebase Data Connect cannot auto-cast existing text columns to enum types.
+# Validate values ("Male" | "Female") in your application layer instead.
+
+enum ImportStatus {
+  processing
+  success
+  partial
+  failed
+}
+
+enum StudentStatus {
+  Enrolled
+  Promoted
+  Retained
+  Transferred
+  Dropped
+}
+
+enum UserRole {
+  admin
+  teacher
+  registrar
+}
+
+enum TranscriptSource {
+  external
+  system
+}
+
+# -------------------
+# Core Types
+# -------------------
+
+type User @table {
+  id: UUID! @default(expr: "uuidV4()")
+  username: String!
+  email: String!
+  passwordHash: String!
+  role: UserRole!
+  isActive: Boolean! @default(expr: "true")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type School @table {
+  id: UUID! @default(expr: "uuidV4()")
+  name: String!
+  depedId: String
+  district: String
+  division: String
+  region: String
+  address: String
+  contactNumber: String
+  email: String
+  principalName: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type SchoolYear @table {
+  id: UUID! @default(expr: "uuidV4()")
+  label: String!
+  startDate: Date!
+  endDate: Date!
+  isActive: Boolean! @default(expr: "false")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Quarter @table {
+  id: UUID! @default(expr: "uuidV4()")
+  schoolYear: SchoolYear!
+  quarterNumber: Int!         # 1-4
+  startDate: Date
+  endDate: Date
+  isActive: Boolean! @default(expr: "false")
+}
+
+type Teacher @table {
+  id: UUID! @default(expr: "uuidV4()")
+  user: User
+  employeeId: String
+  firstName: String!
+  middleName: String
+  lastName: String!
+  suffix: String
+  gender: String              # "Male" | "Female" — validated in app layer
+  birthdate: Date
+  contactNumber: String
+  email: String
+  specialization: String
+  isActive: Boolean! @default(expr: "true")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Section @table {
+  id: UUID! @default(expr: "uuidV4()")
+  schoolYear: SchoolYear!
+  gradeLevel: Int!            # 7-10
+  name: String!
+  adviser: Teacher
+  roomNumber: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Subject @table {
+  id: UUID! @default(expr: "uuidV4()")
+  code: String!
+  name: String!
+  gradeLevel: Int             # 7-10
+  isMapeh: Boolean! @default(expr: "false")
+  mapehComponent: String
+  description: String
+  isActive: Boolean! @default(expr: "true")
+  displayName: String
+  sortOrder: Int! @default(expr: "0")
+  mapehParent: Subject
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type SectionSubject @table(key: ["section", "subject"]) {
+  section: Section!
+  subject: Subject!
+  teacher: Teacher
+}
+
+# -------------------
+# Student and Enrollment
+# -------------------
+
+type Student @table {
+  id: UUID! @default(expr: "uuidV4()")
+  lrn: String!
+  firstName: String!
+  middleName: String
+  lastName: String!
+  suffix: String
+  nameExtension: String
+  gender: String!             # "Male" | "Female" — validated in app layer
+  birthdate: Date!
+  birthPlace: String
+  nationality: String
+  religion: String
+  motherTongue: String
+  address: String
+  barangay: String
+  municipality: String
+  province: String
+  fatherName: String
+  motherName: String
+  guardianName: String
+  guardianRelationship: String
+  contactNumber: String
+  elemSchoolName: String
+  elemSchoolId: String
+  elemSchoolAddress: String
+  elemPeptPasser: Boolean
+  elemPeptDate: Date
+  elemAlsAePasser: Boolean
+  elemAlsAeDate: Date
+  elemCompletionDate: Date
+  elemGenAverage: Float
+  elemCitation: String
+  altCredentialType: String
+  altCredentialRating: Float
+  altCredentialExamDate: Date
+  altCredentialCenter: String
+  isActive: Boolean! @default(expr: "true")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Enrollment @table {
+  id: UUID! @default(expr: "uuidV4()")
+  student: Student!
+  schoolYear: SchoolYear!
+  section: Section!
+  gradeLevel: Int!            # 7-10
+  status: StudentStatus!
+  enrollmentDate: Date!
+  remarks: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type AcademicRecord @table {
+  id: UUID! @default(expr: "uuidV4()")
+  enrollment: Enrollment!
+  generalAverage: Float
+  remarks: String
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type SubjectGrade @table {
+  id: UUID! @default(expr: "uuidV4()")
+  academicRecord: AcademicRecord!
+  subject: Subject!
+  q1Grade: Float
+  q2Grade: Float
+  q3Grade: Float
+  q4Grade: Float
+  finalGrade: Float           # computed via Cloud Function
+  remarks: String             # "Passed" or "Failed" — via Cloud Function
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+# -------------------
+# SF10 / Transcript
+# -------------------
+
+type TranscriptHeader @table {
+  id: UUID! @default(expr: "uuidV4()")
+  student: Student!
+  source: TranscriptSource!
+  enrollment: Enrollment
+  schoolName: String!
+  schoolId: String
+  district: String
+  division: String
+  region: String
+  schoolAddress: String
+  gradeLevel: Int!            # 1-13
+  sectionName: String
+  schoolYear: String!
+  adviserName: String
+  adviserSignature: String
+  generalAverage: Float
+  finalRemarks: String
+  remedialFrom: Date
+  remedialTo: Date
+  displayOrder: Int! @default(expr: "0")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type TranscriptSubjectRow @table {
+  id: UUID! @default(expr: "uuidV4()")
+  transcriptHeader: TranscriptHeader!
+  subjectName: String!
+  isMapeh: Boolean! @default(expr: "false")
+  mapehComponent: String
+  q1Grade: Float
+  q2Grade: Float
+  q3Grade: Float
+  q4Grade: Float
+  finalRating: Float
+  remarks: String
+  rowOrder: Int! @default(expr: "0")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type TranscriptRemedialRow @table {
+  id: UUID! @default(expr: "uuidV4()")
+  transcriptHeader: TranscriptHeader!
+  subjectName: String!
+  finalRating: Float
+  remedialClassMark: Float
+  recomputedFinalGrade: Float
+  remarks: String
+  rowOrder: Int! @default(expr: "0")
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+# -------------------
+# Import System
+# -------------------
+
+type ImportLog @table {
+  id: UUID! @default(expr: "uuidV4()")
+  schoolYear: SchoolYear
+  section: Section
+  quarterNumber: Int          # 1-4
+  sourceUrl: String
+  sourceFilename: String
+  importedBy: User
+  status: ImportStatus!
+  totalRows: Int! @default(expr: "0")
+  successRows: Int! @default(expr: "0")
+  failedRows: Int! @default(expr: "0")
+  errorSummary: String
+  importedAt: Timestamp! @default(expr: "request.time")
+  completedAt: Timestamp
+}
+
+type ColumnMapping @table {
+  id: UUID! @default(expr: "uuidV4()")
+  importLog: ImportLog!
+  sourceColumn: String!
+  targetField: String!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type ImportPreviewRow @table {
+  id: UUID! @default(expr: "uuidV4()")
+  importLog: ImportLog!
+  rowNumber: Int!
+  rawData: String!            # JSON serialized as String
+  mappedData: String          # JSON serialized as String
+  isValid: Boolean! @default(expr: "false")
+  validationNotes: String
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type ValidationError @table {
+  id: UUID! @default(expr: "uuidV4()")
+  importLog: ImportLog!
+  rowNumber: Int
+  fieldName: String
+  rawValue: String
+  errorMessage: String!
+  createdAt: Timestamp! @default(expr: "request.time")
+}

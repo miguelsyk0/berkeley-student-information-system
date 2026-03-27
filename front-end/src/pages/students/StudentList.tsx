@@ -221,20 +221,13 @@ export default function StudentList() {
           <ChevronRight className="w-3 h-3 text-slate-300" />
           <span className="text-xs font-semibold text-slate-600">Student List</span>
           <div className="ml-auto flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 text-xs gap-1.5"
-              onClick={() => navigate(ROUTES.students.enroll)}
-            >
-              <GraduationCap className="w-3.5 h-3.5" /> Enroll Student
-            </Button>
+
             <Button
               size="sm"
               className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
-              onClick={() => navigate(ROUTES.students.add)}
+              onClick={() => navigate(ROUTES.students.enroll)}
             >
-              <Plus className="w-3.5 h-3.5" /> Add Student
+              <GraduationCap className="w-3.5 h-3.5" /> Enroll Student
             </Button>
           </div>
         </header>

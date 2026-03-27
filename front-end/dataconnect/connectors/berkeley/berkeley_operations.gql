@@ -1,0 +1,1096 @@
+# ============================================================
+# Berkeley School System — Queries & Mutations
+# Firebase Data Connect operations file (berkeley_operations.gql)
+# ============================================================
+
+# -------------------
+# Queries
+# -------------------
+
+query GetUser($id: UUID!) @auth(level: USER) {
+  user(id: $id) {
+    id
+    username
+    email
+    role
+    isActive
+    createdAt
+  }
+}
+
+query ListUsers @auth(level: USER) {
+  users {
+    id
+    username
+    email
+    role
+    isActive
+  }
+}
+
+query GetSchool @auth(level: USER) {
+  schools {
+    id
+    name
+    depedId
+    district
+    division
+    region
+    address
+    contactNumber
+    email
+    principalName
+  }
+}
+
+query GetSchoolYear($id: UUID!) @auth(level: USER) {
+  schoolYear(id: $id) {
+    id
+    label
+    startDate
+    endDate
+    isActive
+    quarters_on_schoolYear {
+      id
+      quarterNumber
+      startDate
+      endDate
+      isActive
+    }
+  }
+}
+
+query ListSchoolYears @auth(level: USER) {
+  schoolYears {
+    id
+    label
+    startDate
+    endDate
+    isActive
+  }
+}
+
+query GetActiveSchoolYear @auth(level: USER) {
+  schoolYears(where: { isActive: { eq: true } }) {
+    id
+    label
+    startDate
+    endDate
+    isActive
+  }
+}
+
+query GetTeacher($id: UUID!) @auth(level: USER) {
+  teacher(id: $id) {
+    id
+    employeeId
+    firstName
+    middleName
+    lastName
+    suffix
+    gender
+    birthdate
+    contactNumber
+    email
+    specialization
+    isActive
+  }
+}
+
+query ListTeachers @auth(level: USER) {
+  teachers {
+    id
+    employeeId
+    firstName
+    middleName
+    lastName
+    gender
+    specialization
+    isActive
+  }
+}
+
+query GetSection($id: UUID!) @auth(level: USER) {
+  section(id: $id) {
+    id
+    gradeLevel
+    name
+    roomNumber
+    schoolYear {
+      id
+      label
+    }
+    adviser {
+      id
+      firstName
+      lastName
+    }
+    sectionSubjects_on_section {
+      id
+      subject {
+        id
+        name
+        code
+      }
+      teacher {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+}
+
+query ListSections($schoolYearId: UUID) @auth(level: USER) {
+  sections(where: { schoolYear: { id: { eq: $schoolYearId } } }) {
+    id
+    gradeLevel
+    name
+    roomNumber
+    adviser {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+
+query GetSubject($id: UUID!) @auth(level: USER) {
+  subject(id: $id) {
+    id
+    code
+    name
+    gradeLevel
+    isMapeh
+    mapehComponent
+    description
+    displayName
+    sortOrder
+    isActive
+  }
+}
+
+query ListSubjects @auth(level: USER) {
+  subjects(orderBy: [{ sortOrder: ASC }, { name: ASC }]) {
+    id
+    code
+    name
+    gradeLevel
+    isMapeh
+    mapehComponent
+    displayName
+    sortOrder
+    isActive
+  }
+}
+
+query GetStudent($id: UUID!) @auth(level: USER) {
+  student(id: $id) {
+    id
+    lrn
+    firstName
+    middleName
+    lastName
+    suffix
+    nameExtension
+    gender
+    birthdate
+    birthPlace
+    nationality
+    religion
+    motherTongue
+    address
+    barangay
+    municipality
+    province
+    fatherName
+    motherName
+    guardianName
+    guardianRelationship
+    contactNumber
+    elemSchoolName
+    elemSchoolId
+    elemGenAverage
+    elemCitation
+    isActive
+    createdAt
+  }
+}
+
+query GetStudentByLrn($lrn: String!) @auth(level: USER) {
+  students(where: { lrn: { eq: $lrn } }) {
+    id
+    lrn
+    firstName
+    middleName
+    lastName
+    suffix
+    gender
+    birthdate
+    isActive
+  }
+}
+
+query ListStudents @auth(level: USER) {
+  students(orderBy: [{ lastName: ASC }, { firstName: ASC }]) {
+    id
+    lrn
+    firstName
+    middleName
+    lastName
+    suffix
+    gender
+    birthdate
+    isActive
+  }
+}
+
+query GetEnrollment($id: UUID!) @auth(level: USER) {
+  enrollment(id: $id) {
+    id
+    gradeLevel
+    status
+    enrollmentDate
+    remarks
+    student {
+      id
+      lrn
+      firstName
+      middleName
+      lastName
+    }
+    schoolYear {
+      id
+      label
+    }
+    section {
+      id
+      name
+      gradeLevel
+    }
+    academicRecords_on_enrollment {
+      id
+      generalAverage
+      remarks
+    }
+  }
+}
+
+query ListEnrollments($schoolYearId: UUID, $sectionId: UUID) @auth(level: USER) {
+  enrollments(where: {
+    schoolYear: { id: { eq: $schoolYearId } }
+    section: { id: { eq: $sectionId } }
+  }) {
+    id
+    gradeLevel
+    status
+    enrollmentDate
+    student {
+      id
+      lrn
+      firstName
+      lastName
+    }
+    schoolYear {
+      id
+      label
+    }
+    section {
+      id
+      name
+    }
+  }
+}
+
+query GetAcademicRecord($id: UUID!) @auth(level: USER) {
+  academicRecord(id: $id) {
+    id
+    generalAverage
+    remarks
+    enrollment {
+      id
+      gradeLevel
+      status
+      student {
+        id
+        lrn
+        firstName
+        lastName
+      }
+    }
+    subjectGrades_on_academicRecord {
+      id
+      q1Grade
+      q2Grade
+      q3Grade
+      q4Grade
+      finalGrade
+      remarks
+      subject {
+        id
+        name
+        code
+        isMapeh
+        mapehComponent
+      }
+    }
+  }
+}
+
+query ListSubjectGrades($academicRecordId: UUID!) @auth(level: USER) {
+  subjectGrades(where: { academicRecord: { id: { eq: $academicRecordId } } }) {
+    id
+    q1Grade
+    q2Grade
+    q3Grade
+    q4Grade
+    finalGrade
+    remarks
+    subject {
+      id
+      name
+      code
+    }
+  }
+}
+
+query GetTranscriptHeader($id: UUID!) @auth(level: USER) {
+  transcriptHeader(id: $id) {
+    id
+    source
+    schoolName
+    schoolId
+    district
+    division
+    region
+    schoolAddress
+    gradeLevel
+    sectionName
+    schoolYear
+    adviserName
+    generalAverage
+    finalRemarks
+    remedialFrom
+    remedialTo
+    displayOrder
+    transcriptSubjectRows_on_transcriptHeader {
+      id
+      subjectName
+      isMapeh
+      mapehComponent
+      q1Grade
+      q2Grade
+      q3Grade
+      q4Grade
+      finalRating
+      remarks
+      rowOrder
+    }
+    transcriptRemedialRows_on_transcriptHeader {
+      id
+      subjectName
+      finalRating
+      remedialClassMark
+      recomputedFinalGrade
+      remarks
+      rowOrder
+    }
+  }
+}
+
+query ListTranscriptHeaders($studentId: UUID!) @auth(level: USER) {
+  transcriptHeaders(
+    where: { student: { id: { eq: $studentId } } }
+    orderBy: [{ displayOrder: ASC }, { gradeLevel: ASC }]
+  ) {
+    id
+    source
+    gradeLevel
+    sectionName
+    schoolYear
+    schoolName
+    generalAverage
+    finalRemarks
+    displayOrder
+  }
+}
+
+query GetImportLog($id: UUID!) @auth(level: USER) {
+  importLog(id: $id) {
+    id
+    quarterNumber
+    sourceUrl
+    sourceFilename
+    status
+    totalRows
+    successRows
+    failedRows
+    errorSummary
+    importedAt
+    completedAt
+    schoolYear {
+      id
+      label
+    }
+    section {
+      id
+      name
+      gradeLevel
+    }
+    columnMappings_on_importLog {
+      id
+      sourceColumn
+      targetField
+    }
+    importPreviewRows_on_importLog {
+      id
+      rowNumber
+      rawData
+      mappedData
+      isValid
+      validationNotes
+    }
+    validationErrors_on_importLog {
+      id
+      rowNumber
+      fieldName
+      rawValue
+      errorMessage
+    }
+  }
+}
+
+query ListImportLogs @auth(level: USER) {
+  importLogs(orderBy: [{ importedAt: DESC }]) {
+    id
+    quarterNumber
+    sourceFilename
+    status
+    totalRows
+    successRows
+    failedRows
+    importedAt
+    completedAt
+    section {
+      id
+      name
+      gradeLevel
+    }
+  }
+}
+
+# -------------------
+# Mutations
+# -------------------
+
+mutation CreateUser(
+  $username: String!
+  $email: String!
+  $passwordHash: String!
+  $role: UserRole!
+) @auth(level: USER) {
+  user_insert(data: {
+    username: $username
+    email: $email
+    passwordHash: $passwordHash
+    role: $role
+    isActive: true
+  })
+}
+
+mutation UpdateUser(
+  $id: UUID!
+  $username: String
+  $email: String
+  $role: UserRole
+  $isActive: Boolean
+) @auth(level: USER) {
+  user_update(id: $id, data: {
+    username: $username
+    email: $email
+    role: $role
+    isActive: $isActive
+  })
+}
+
+mutation UpsertSchool(
+  $name: String!
+  $depedId: String
+  $district: String
+  $division: String
+  $region: String
+  $address: String
+  $contactNumber: String
+  $email: String
+  $principalName: String
+) @auth(level: USER) {
+  school_upsert(data: {
+    name: $name
+    depedId: $depedId
+    district: $district
+    division: $division
+    region: $region
+    address: $address
+    contactNumber: $contactNumber
+    email: $email
+    principalName: $principalName
+  })
+}
+
+mutation CreateSchoolYear(
+  $label: String!
+  $startDate: Date!
+  $endDate: Date!
+  $isActive: Boolean
+) @auth(level: USER) {
+  schoolYear_insert(data: {
+    label: $label
+    startDate: $startDate
+    endDate: $endDate
+    isActive: $isActive
+  })
+}
+
+mutation UpsertQuarter(
+  $schoolYearId: UUID!
+  $quarterNumber: Int!
+  $startDate: Date
+  $endDate: Date
+  $isActive: Boolean
+) @auth(level: USER) {
+  quarter_upsert(data: {
+    schoolYearId: $schoolYearId
+    quarterNumber: $quarterNumber
+    startDate: $startDate
+    endDate: $endDate
+    isActive: $isActive
+  })
+}
+
+mutation CreateTeacher(
+  $userId: UUID
+  $employeeId: String
+  $firstName: String!
+  $middleName: String
+  $lastName: String!
+  $suffix: String
+  $gender: String
+  $birthdate: Date
+  $contactNumber: String
+  $email: String
+  $specialization: String
+) @auth(level: USER) {
+  teacher_insert(data: {
+    userId: $userId
+    employeeId: $employeeId
+    firstName: $firstName
+    middleName: $middleName
+    lastName: $lastName
+    suffix: $suffix
+    gender: $gender
+    birthdate: $birthdate
+    contactNumber: $contactNumber
+    email: $email
+    specialization: $specialization
+    isActive: true
+  })
+}
+
+mutation UpdateTeacher(
+  $id: UUID!
+  $employeeId: String
+  $firstName: String
+  $middleName: String
+  $lastName: String
+  $suffix: String
+  $gender: String
+  $birthdate: Date
+  $contactNumber: String
+  $email: String
+  $specialization: String
+  $isActive: Boolean
+) @auth(level: USER) {
+  teacher_update(id: $id, data: {
+    employeeId: $employeeId
+    firstName: $firstName
+    middleName: $middleName
+    lastName: $lastName
+    suffix: $suffix
+    gender: $gender
+    birthdate: $birthdate
+    contactNumber: $contactNumber
+    email: $email
+    specialization: $specialization
+    isActive: $isActive
+  })
+}
+
+mutation CreateSection(
+  $schoolYearId: UUID!
+  $gradeLevel: Int!
+  $name: String!
+  $adviserId: UUID
+  $roomNumber: String
+) @auth(level: USER) {
+  section_insert(data: {
+    schoolYearId: $schoolYearId
+    gradeLevel: $gradeLevel
+    name: $name
+    adviserId: $adviserId
+    roomNumber: $roomNumber
+  })
+}
+
+mutation UpdateSection(
+  $id: UUID!
+  $gradeLevel: Int
+  $name: String
+  $adviserId: UUID
+  $roomNumber: String
+) @auth(level: USER) {
+  section_update(id: $id, data: {
+    gradeLevel: $gradeLevel
+    name: $name
+    adviserId: $adviserId
+    roomNumber: $roomNumber
+  })
+}
+
+mutation AssignSubjectToSection(
+  $sectionId: UUID!
+  $subjectId: UUID!
+  $teacherId: UUID
+) @auth(level: USER) {
+  sectionSubject_upsert(data: {
+    sectionId: $sectionId
+    subjectId: $subjectId
+    teacherId: $teacherId
+  })
+}
+
+mutation CreateSubject(
+  $code: String!
+  $name: String!
+  $gradeLevel: Int
+  $isMapeh: Boolean
+  $mapehComponent: String
+  $description: String
+  $displayName: String
+  $sortOrder: Int
+  $mapehParentId: UUID
+) @auth(level: USER) {
+  subject_insert(data: {
+    code: $code
+    name: $name
+    gradeLevel: $gradeLevel
+    isMapeh: $isMapeh
+    mapehComponent: $mapehComponent
+    description: $description
+    displayName: $displayName
+    sortOrder: $sortOrder
+    mapehParentId: $mapehParentId
+    isActive: true
+  })
+}
+
+mutation UpdateSubject(
+  $id: UUID!
+  $code: String
+  $name: String
+  $gradeLevel: Int
+  $isMapeh: Boolean
+  $mapehComponent: String
+  $description: String
+  $isActive: Boolean
+  $displayName: String
+  $sortOrder: Int
+  $mapehParentId: UUID
+) @auth(level: USER) {
+  subject_update(id: $id, data: {
+    code: $code
+    name: $name
+    gradeLevel: $gradeLevel
+    isMapeh: $isMapeh
+    mapehComponent: $mapehComponent
+    description: $description
+    isActive: $isActive
+    displayName: $displayName
+    sortOrder: $sortOrder
+    mapehParentId: $mapehParentId
+  })
+}
+
+mutation CreateStudent(
+  $lrn: String!
+  $firstName: String!
+  $middleName: String
+  $lastName: String!
+  $suffix: String
+  $nameExtension: String
+  $gender: String!
+  $birthdate: Date!
+  $birthPlace: String
+  $nationality: String
+  $religion: String
+  $motherTongue: String
+  $address: String
+  $barangay: String
+  $municipality: String
+  $province: String
+  $fatherName: String
+  $motherName: String
+  $guardianName: String
+  $guardianRelationship: String
+  $contactNumber: String
+  $elemSchoolName: String
+  $elemSchoolId: String
+  $elemSchoolAddress: String
+  $elemPeptPasser: Boolean
+  $elemPeptDate: Date
+  $elemAlsAePasser: Boolean
+  $elemAlsAeDate: Date
+  $elemCompletionDate: Date
+  $elemGenAverage: Float
+  $elemCitation: String
+  $altCredentialType: String
+  $altCredentialRating: Float
+  $altCredentialExamDate: Date
+  $altCredentialCenter: String
+) @auth(level: USER) {
+  student_insert(data: {
+    lrn: $lrn
+    firstName: $firstName
+    middleName: $middleName
+    lastName: $lastName
+    suffix: $suffix
+    nameExtension: $nameExtension
+    gender: $gender
+    birthdate: $birthdate
+    birthPlace: $birthPlace
+    nationality: $nationality
+    religion: $religion
+    motherTongue: $motherTongue
+    address: $address
+    barangay: $barangay
+    municipality: $municipality
+    province: $province
+    fatherName: $fatherName
+    motherName: $motherName
+    guardianName: $guardianName
+    guardianRelationship: $guardianRelationship
+    contactNumber: $contactNumber
+    elemSchoolName: $elemSchoolName
+    elemSchoolId: $elemSchoolId
+    elemSchoolAddress: $elemSchoolAddress
+    elemPeptPasser: $elemPeptPasser
+    elemPeptDate: $elemPeptDate
+    elemAlsAePasser: $elemAlsAePasser
+    elemAlsAeDate: $elemAlsAeDate
+    elemCompletionDate: $elemCompletionDate
+    elemGenAverage: $elemGenAverage
+    elemCitation: $elemCitation
+    altCredentialType: $altCredentialType
+    altCredentialRating: $altCredentialRating
+    altCredentialExamDate: $altCredentialExamDate
+    altCredentialCenter: $altCredentialCenter
+    isActive: true
+  })
+}
+
+mutation UpdateStudent(
+  $id: UUID!
+  $firstName: String
+  $middleName: String
+  $lastName: String
+  $suffix: String
+  $nameExtension: String
+  $gender: String
+  $birthdate: Date
+  $birthPlace: String
+  $nationality: String
+  $religion: String
+  $motherTongue: String
+  $address: String
+  $barangay: String
+  $municipality: String
+  $province: String
+  $fatherName: String
+  $motherName: String
+  $guardianName: String
+  $guardianRelationship: String
+  $contactNumber: String
+  $elemSchoolName: String
+  $elemSchoolId: String
+  $elemSchoolAddress: String
+  $elemPeptPasser: Boolean
+  $elemPeptDate: Date
+  $elemAlsAePasser: Boolean
+  $elemAlsAeDate: Date
+  $elemCompletionDate: Date
+  $elemGenAverage: Float
+  $elemCitation: String
+  $altCredentialType: String
+  $altCredentialRating: Float
+  $altCredentialExamDate: Date
+  $altCredentialCenter: String
+  $isActive: Boolean
+) @auth(level: USER) {
+  student_update(id: $id, data: {
+    firstName: $firstName
+    middleName: $middleName
+    lastName: $lastName
+    suffix: $suffix
+    nameExtension: $nameExtension
+    gender: $gender
+    birthdate: $birthdate
+    birthPlace: $birthPlace
+    nationality: $nationality
+    religion: $religion
+    motherTongue: $motherTongue
+    address: $address
+    barangay: $barangay
+    municipality: $municipality
+    province: $province
+    fatherName: $fatherName
+    motherName: $motherName
+    guardianName: $guardianName
+    guardianRelationship: $guardianRelationship
+    contactNumber: $contactNumber
+    elemSchoolName: $elemSchoolName
+    elemSchoolId: $elemSchoolId
+    elemSchoolAddress: $elemSchoolAddress
+    elemPeptPasser: $elemPeptPasser
+    elemPeptDate: $elemPeptDate
+    elemAlsAePasser: $elemAlsAePasser
+    elemAlsAeDate: $elemAlsAeDate
+    elemCompletionDate: $elemCompletionDate
+    elemGenAverage: $elemGenAverage
+    elemCitation: $elemCitation
+    altCredentialType: $altCredentialType
+    altCredentialRating: $altCredentialRating
+    altCredentialExamDate: $altCredentialExamDate
+    altCredentialCenter: $altCredentialCenter
+    isActive: $isActive
+  })
+}
+
+mutation EnrollStudent(
+  $studentId: UUID!
+  $schoolYearId: UUID!
+  $sectionId: UUID!
+  $gradeLevel: Int!
+  $enrollmentDate: Date!
+) @auth(level: USER) {
+  enrollment_insert(data: {
+    studentId: $studentId
+    schoolYearId: $schoolYearId
+    sectionId: $sectionId
+    gradeLevel: $gradeLevel
+    enrollmentDate: $enrollmentDate
+    status: Enrolled
+  })
+}
+
+mutation UpdateEnrollmentStatus(
+  $id: UUID!
+  $status: StudentStatus!
+  $remarks: String
+) @auth(level: USER) {
+  enrollment_update(id: $id, data: {
+    status: $status
+    remarks: $remarks
+  })
+}
+
+mutation UpsertSubjectGrade(
+  $academicRecordId: UUID!
+  $subjectId: UUID!
+  $q1Grade: Float
+  $q2Grade: Float
+  $q3Grade: Float
+  $q4Grade: Float
+) @auth(level: USER) {
+  subjectGrade_upsert(data: {
+    academicRecordId: $academicRecordId
+    subjectId: $subjectId
+    q1Grade: $q1Grade
+    q2Grade: $q2Grade
+    q3Grade: $q3Grade
+    q4Grade: $q4Grade
+  })
+}
+
+mutation CreateTranscriptHeader(
+  $studentId: UUID!
+  $source: TranscriptSource!
+  $enrollmentId: UUID
+  $schoolName: String!
+  $schoolId: String
+  $district: String
+  $division: String
+  $region: String
+  $schoolAddress: String
+  $gradeLevel: Int!
+  $sectionName: String
+  $schoolYear: String!
+  $adviserName: String
+  $generalAverage: Float
+  $finalRemarks: String
+  $remedialFrom: Date
+  $remedialTo: Date
+  $displayOrder: Int
+) @auth(level: USER) {
+  transcriptHeader_insert(data: {
+    studentId: $studentId
+    source: $source
+    enrollmentId: $enrollmentId
+    schoolName: $schoolName
+    schoolId: $schoolId
+    district: $district
+    division: $division
+    region: $region
+    schoolAddress: $schoolAddress
+    gradeLevel: $gradeLevel
+    sectionName: $sectionName
+    schoolYear: $schoolYear
+    adviserName: $adviserName
+    generalAverage: $generalAverage
+    finalRemarks: $finalRemarks
+    remedialFrom: $remedialFrom
+    remedialTo: $remedialTo
+    displayOrder: $displayOrder
+  })
+}
+
+mutation AddTranscriptSubjectRow(
+  $transcriptHeaderId: UUID!
+  $subjectName: String!
+  $isMapeh: Boolean
+  $mapehComponent: String
+  $q1Grade: Float
+  $q2Grade: Float
+  $q3Grade: Float
+  $q4Grade: Float
+  $finalRating: Float
+  $remarks: String
+  $rowOrder: Int
+) @auth(level: USER) {
+  transcriptSubjectRow_insert(data: {
+    transcriptHeaderId: $transcriptHeaderId
+    subjectName: $subjectName
+    isMapeh: $isMapeh
+    mapehComponent: $mapehComponent
+    q1Grade: $q1Grade
+    q2Grade: $q2Grade
+    q3Grade: $q3Grade
+    q4Grade: $q4Grade
+    finalRating: $finalRating
+    remarks: $remarks
+    rowOrder: $rowOrder
+  })
+}
+
+mutation AddTranscriptRemedialRow(
+  $transcriptHeaderId: UUID!
+  $subjectName: String!
+  $finalRating: Float
+  $remedialClassMark: Float
+  $recomputedFinalGrade: Float
+  $remarks: String
+  $rowOrder: Int
+) @auth(level: USER) {
+  transcriptRemedialRow_insert(data: {
+    transcriptHeaderId: $transcriptHeaderId
+    subjectName: $subjectName
+    finalRating: $finalRating
+    remedialClassMark: $remedialClassMark
+    recomputedFinalGrade: $recomputedFinalGrade
+    remarks: $remarks
+    rowOrder: $rowOrder
+  })
+}
+
+mutation StartImport(
+  $schoolYearId: UUID!
+  $sectionId: UUID!
+  $quarterNumber: Int!
+  $sourceUrl: String
+  $sourceFilename: String
+  $importedBy: UUID
+) @auth(level: USER) {
+  importLog_insert(data: {
+    schoolYearId: $schoolYearId
+    sectionId: $sectionId
+    quarterNumber: $quarterNumber
+    sourceUrl: $sourceUrl
+    sourceFilename: $sourceFilename
+    importedById: $importedBy
+    status: processing
+    totalRows: 0
+    successRows: 0
+    failedRows: 0
+  })
+}
+
+mutation UpdateImportStatus(
+  $id: UUID!
+  $status: ImportStatus!
+  $totalRows: Int
+  $successRows: Int
+  $failedRows: Int
+  $errorSummary: String
+) @auth(level: USER) {
+  importLog_update(id: $id, data: {
+    status: $status
+    totalRows: $totalRows
+    successRows: $successRows
+    failedRows: $failedRows
+    errorSummary: $errorSummary
+  })
+}
+
+mutation AddColumnMapping(
+  $importLogId: UUID!
+  $sourceColumn: String!
+  $targetField: String!
+) @auth(level: USER) {
+  columnMapping_insert(data: {
+    importLogId: $importLogId
+    sourceColumn: $sourceColumn
+    targetField: $targetField
+  })
+}
+
+mutation AddImportPreviewRow(
+  $importLogId: UUID!
+  $rowNumber: Int!
+  $rawData: String!
+  $mappedData: String
+  $isValid: Boolean!
+  $validationNotes: String
+) @auth(level: USER) {
+  importPreviewRow_insert(data: {
+    importLogId: $importLogId
+    rowNumber: $rowNumber
+    rawData: $rawData
+    mappedData: $mappedData
+    isValid: $isValid
+    validationNotes: $validationNotes
+  })
+}
+
+mutation AddValidationError(
+  $importLogId: UUID!
+  $rowNumber: Int
+  $fieldName: String
+  $rawValue: String
+  $errorMessage: String!
+) @auth(level: USER) {
+  validationError_insert(data: {
+    importLogId: $importLogId
+    rowNumber: $rowNumber
+    fieldName: $fieldName
+    rawValue: $rawValue
+    errorMessage: $errorMessage
+  })
+}

@@ -1,5 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
+// Firebase Imports
+import { firebaseConfig } from "./firebase-config";
+import { initializeApp } from "firebase/app";
+import { getFirestore } from 'firebase/firestore/lite';
+
 // ── Auth ───────────────────────────────────────────────────────────────────────
 import Login from "@/pages/auth/Login";
 // import ForgotPassword from "@/pages/auth/ForgotPassword";
@@ -40,6 +45,9 @@ import SingleStudentSF10   from "@/pages/sf10/SingleStudentSF10";
 import BulkSF10Generation  from "@/pages/sf10/BulkSF10Generation";
 
 export default function App() {
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  
   return (
     <BrowserRouter>
       <Routes>
