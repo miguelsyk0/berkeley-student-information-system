@@ -13,8 +13,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import Sidebar from "@/components/sidebar";
 import { ROUTES } from "@/routes";
+import { useHeader } from "@/contexts/HeaderContext";
+import React from "react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -35,48 +36,54 @@ interface PreviewRow {
 // ── Mock data for preview ──────────────────────────────────────────────────────
 
 const MOCK_COLUMN_MAPS: ColumnMap[] = [
-  { sheetColumn: "A",  mappedTo: "lrn",    autoDetected: true  },
-  { sheetColumn: "B",  mappedTo: "lastName", autoDetected: true },
-  { sheetColumn: "C",  mappedTo: "firstName", autoDetected: true },
-  { sheetColumn: "D",  mappedTo: "q1_LA",   autoDetected: true  },
-  { sheetColumn: "E",  mappedTo: "q1_SCI",  autoDetected: true  },
-  { sheetColumn: "F",  mappedTo: "q1_MATH", autoDetected: true  },
-  { sheetColumn: "G",  mappedTo: "q1_SL",   autoDetected: true  },
-  { sheetColumn: "H",  mappedTo: "q1_EL",   autoDetected: true  },
-  { sheetColumn: "I",  mappedTo: "q1_WP",   autoDetected: false },
-  { sheetColumn: "J",  mappedTo: "q1_MAP",  autoDetected: true  },
-  { sheetColumn: "K",  mappedTo: "q1_TLE",  autoDetected: true  },
-  { sheetColumn: "L",  mappedTo: "q1_MSE",  autoDetected: true  },
-  { sheetColumn: "M",  mappedTo: "q1_COD",  autoDetected: true  },
+  { sheetColumn: "A", mappedTo: "lrn", autoDetected: true },
+  { sheetColumn: "B", mappedTo: "lastName", autoDetected: true },
+  { sheetColumn: "C", mappedTo: "firstName", autoDetected: true },
+  { sheetColumn: "D", mappedTo: "q1_LA", autoDetected: true },
+  { sheetColumn: "E", mappedTo: "q1_SCI", autoDetected: true },
+  { sheetColumn: "F", mappedTo: "q1_MATH", autoDetected: true },
+  { sheetColumn: "G", mappedTo: "q1_SL", autoDetected: true },
+  { sheetColumn: "H", mappedTo: "q1_EL", autoDetected: true },
+  { sheetColumn: "I", mappedTo: "q1_WP", autoDetected: false },
+  { sheetColumn: "J", mappedTo: "q1_MAP", autoDetected: true },
+  { sheetColumn: "K", mappedTo: "q1_TLE", autoDetected: true },
+  { sheetColumn: "L", mappedTo: "q1_MSE", autoDetected: true },
+  { sheetColumn: "M", mappedTo: "q1_COD", autoDetected: true },
 ];
 
 const MOCK_PREVIEW: PreviewRow[] = [
-  { row: 2, lrn: "105012300001", studentName: "Santos, Miguel",   grades: { LA: "94", SCI: "95", MATH: "91", SL: "90", EL: "92" }, errors: [] },
-  { row: 3, lrn: "105012300002", studentName: "Reyes, Sofia",     grades: { LA: "96", SCI: "93", MATH: "88", SL: "91", EL: "94" }, errors: [] },
-  { row: 4, lrn: "105012300099", studentName: "Unknown, Student", grades: { LA: "88", SCI: "90", MATH: "85", SL: "89", EL: "91" },
-    errors: [{ field: "lrn", message: "LRN not found in the system.", severity: "error" }] },
-  { row: 5, lrn: "105012300004", studentName: "Villanueva, Lara", grades: { LA: "90", SCI: "92", MATH: "105", SL: "88", EL: "95" },
-    errors: [{ field: "MATH", message: "Grade 105 is out of range (0–100).", severity: "error" }] },
-  { row: 6, lrn: "105012300005", studentName: "Cruz, Nathan",     grades: { LA: "91", SCI: "87", MATH: "93", SL: "90", EL: "" },
-    errors: [{ field: "EL", message: "Missing grade value.", severity: "warning" }] },
-  { row: 7, lrn: "105012300006", studentName: "Lim, Andrea",      grades: { LA: "85", SCI: "88", MATH: "90", SL: "86", EL: "89" }, errors: [] },
+  { row: 2, lrn: "105012300001", studentName: "Santos, Miguel", grades: { LA: "94", SCI: "95", MATH: "91", SL: "90", EL: "92" }, errors: [] },
+  { row: 3, lrn: "105012300002", studentName: "Reyes, Sofia", grades: { LA: "96", SCI: "93", MATH: "88", SL: "91", EL: "94" }, errors: [] },
+  {
+    row: 4, lrn: "105012300099", studentName: "Unknown, Student", grades: { LA: "88", SCI: "90", MATH: "85", SL: "89", EL: "91" },
+    errors: [{ field: "lrn", message: "LRN not found in the system.", severity: "error" }]
+  },
+  {
+    row: 5, lrn: "105012300004", studentName: "Villanueva, Lara", grades: { LA: "90", SCI: "92", MATH: "105", SL: "88", EL: "95" },
+    errors: [{ field: "MATH", message: "Grade 105 is out of range (0–100).", severity: "error" }]
+  },
+  {
+    row: 6, lrn: "105012300005", studentName: "Cruz, Nathan", grades: { LA: "91", SCI: "87", MATH: "93", SL: "90", EL: "" },
+    errors: [{ field: "EL", message: "Missing grade value.", severity: "warning" }]
+  },
+  { row: 7, lrn: "105012300006", studentName: "Lim, Andrea", grades: { LA: "85", SCI: "88", MATH: "90", SL: "86", EL: "89" }, errors: [] },
 ];
 
 const FIELD_OPTIONS = [
-  { value: "skip",      label: "— Skip column —" },
-  { value: "lrn",       label: "LRN" },
-  { value: "lastName",  label: "Last Name" },
+  { value: "skip", label: "— Skip column —" },
+  { value: "lrn", label: "LRN" },
+  { value: "lastName", label: "Last Name" },
   { value: "firstName", label: "First Name" },
-  { value: "q1_LA",     label: "Q1 — Logical Analysis" },
-  { value: "q1_SCI",    label: "Q1 — Science Lab" },
-  { value: "q1_MATH",   label: "Q1 — Math Lab" },
-  { value: "q1_SL",     label: "Q1 — Social Literacy" },
-  { value: "q1_EL",     label: "Q1 — English Lab" },
-  { value: "q1_WP",     label: "Q1 — Wika at Pagpapakatao" },
-  { value: "q1_MAP",    label: "Q1 — Psychomotor" },
-  { value: "q1_TLE",    label: "Q1 — TLE" },
-  { value: "q1_MSE",    label: "Q1 — MSE" },
-  { value: "q1_COD",    label: "Q1 — Coding" },
+  { value: "q1_LA", label: "Q1 — Logical Analysis" },
+  { value: "q1_SCI", label: "Q1 — Science Lab" },
+  { value: "q1_MATH", label: "Q1 — Math Lab" },
+  { value: "q1_SL", label: "Q1 — Social Literacy" },
+  { value: "q1_EL", label: "Q1 — English Lab" },
+  { value: "q1_WP", label: "Q1 — Wika at Pagpapakatao" },
+  { value: "q1_MAP", label: "Q1 — Psychomotor" },
+  { value: "q1_TLE", label: "Q1 — TLE" },
+  { value: "q1_MSE", label: "Q1 — MSE" },
+  { value: "q1_COD", label: "Q1 — Coding" },
 ];
 
 // ── Step Indicator ─────────────────────────────────────────────────────────────
@@ -87,15 +94,15 @@ function StepIndicator({ step }: { step: number }) {
     <div className="flex items-center gap-2">
       {steps.map((label, i) => {
         const n = i + 1;
-        const done    = step > n;
+        const done = step > n;
         const current = step === n;
         return (
           <div key={n} className="flex items-center gap-2">
             <div className="flex items-center gap-2">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black transition-colors
-                ${done    ? "bg-emerald-500 text-white" :
-                  current ? "bg-teal-600 text-white"  :
-                  "bg-slate-100 text-slate-400"}`}
+                ${done ? "bg-emerald-500 text-white" :
+                  current ? "bg-teal-600 text-white" :
+                    "bg-slate-100 text-slate-400"}`}
               >
                 {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : n}
               </div>
@@ -120,9 +127,9 @@ function Step1({
   errors,
 }: {
   driveUrl: string; setDriveUrl: (v: string) => void;
-  section: string;  setSection:  (v: string) => void;
+  section: string; setSection: (v: string) => void;
   gradeLevel: string; setGradeLevel: (v: string) => void;
-  quarter: string;  setQuarter:  (v: string) => void;
+  quarter: string; setQuarter: (v: string) => void;
   schoolYear: string; setSchoolYear: (v: string) => void;
   errors: Record<string, string>;
 }) {
@@ -198,7 +205,7 @@ function Step1({
                 <SelectValue placeholder="Select..." />
               </SelectTrigger>
               <SelectContent>
-                {[1,2,3,4].map((q) => <SelectItem key={q} value={String(q)}>{q}st Quarter</SelectItem>)}
+                {[1, 2, 3, 4].map((q) => <SelectItem key={q} value={String(q)}>{q}st Quarter</SelectItem>)}
               </SelectContent>
             </Select>
             {errors.quarter && <p className="text-[11px] text-red-500 mt-1">{errors.quarter}</p>}
@@ -212,7 +219,7 @@ function Step1({
                 <SelectValue placeholder="Select..." />
               </SelectTrigger>
               <SelectContent>
-                {[7,8,9,10].map((g) => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}
+                {[7, 8, 9, 10].map((g) => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}
               </SelectContent>
             </Select>
             {errors.gradeLevel && <p className="text-[11px] text-red-500 mt-1">{errors.gradeLevel}</p>}
@@ -226,7 +233,7 @@ function Step1({
                 <SelectValue placeholder="Select..." />
               </SelectTrigger>
               <SelectContent>
-                {["Integrity","Honesty","Loyalty","Diligence","Humility","Wisdom","Courage","Excellence"].map((s) => (
+                {["Integrity", "Honesty", "Loyalty", "Diligence", "Humility", "Wisdom", "Courage", "Excellence"].map((s) => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
@@ -283,8 +290,8 @@ function Step2({ columnMaps, setColumnMaps }: {
                 <td className="px-4 py-2.5">
                   <span className="text-xs text-slate-500 italic">
                     {map.mappedTo === "lrn" ? "105012300001" :
-                     map.mappedTo === "lastName" ? "Santos" :
-                     map.mappedTo === "firstName" ? "Miguel" : "94"}
+                      map.mappedTo === "lastName" ? "Santos" :
+                        map.mappedTo === "firstName" ? "Miguel" : "94"}
                   </span>
                 </td>
                 <td className="px-4 py-2.5">
@@ -317,18 +324,18 @@ function Step2({ columnMaps, setColumnMaps }: {
 // ── Step 3: Validate & Preview ─────────────────────────────────────────────────
 
 function Step3({ rows }: { rows: PreviewRow[] }) {
-  const errorCount   = rows.filter((r) => r.errors.some((e) => e.severity === "error")).length;
+  const errorCount = rows.filter((r) => r.errors.some((e) => e.severity === "error")).length;
   const warningCount = rows.filter((r) => r.errors.some((e) => e.severity === "warning")).length;
-  const cleanCount   = rows.filter((r) => r.errors.length === 0).length;
+  const cleanCount = rows.filter((r) => r.errors.length === 0).length;
 
   return (
     <div className="space-y-4">
       {/* Summary */}
       <div className="flex gap-3">
         {[
-          { label: "Ready to encode", count: cleanCount,   color: "bg-emerald-100 text-emerald-700" },
-          { label: "Warnings",         count: warningCount, color: "bg-amber-100   text-amber-700"   },
-          { label: "Errors (skipped)", count: errorCount,   color: "bg-red-100     text-red-700"     },
+          { label: "Ready to encode", count: cleanCount, color: "bg-emerald-100 text-emerald-700" },
+          { label: "Warnings", count: warningCount, color: "bg-amber-100   text-amber-700" },
+          { label: "Errors (skipped)", count: errorCount, color: "bg-red-100     text-red-700" },
         ].map(({ label, count, color }) => (
           <div key={label} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl ${color}`}>
             <span className="text-xl font-black">{count}</span>
@@ -361,7 +368,7 @@ function Step3({ rows }: { rows: PreviewRow[] }) {
           </thead>
           <tbody>
             {rows.map((row) => {
-              const hasError   = row.errors.some((e) => e.severity === "error");
+              const hasError = row.errors.some((e) => e.severity === "error");
               const hasWarning = row.errors.some((e) => e.severity === "warning");
               return (
                 <tr key={row.row} className={`border-b border-slate-100 last:border-0 ${hasError ? "bg-red-50/40" : hasWarning ? "bg-amber-50/40" : ""}`}>
@@ -422,7 +429,7 @@ function Step4({
   rows: PreviewRow[]; onEncode: () => void; encoding: boolean;
 }) {
   const toEncode = rows.filter((r) => !r.errors.some((e) => e.severity === "error")).length;
-  const toSkip   = rows.length - toEncode;
+  const toSkip = rows.length - toEncode;
 
   return (
     <div className="space-y-4 max-w-2xl">
@@ -431,13 +438,13 @@ function Step4({
           <p className="text-sm font-black text-slate-700">Import Summary</p>
           <div className="divide-y divide-slate-100">
             {[
-              { label: "File",         value: fileName || "Grade_Sheet.xlsx" },
-              { label: "School Year",  value: schoolYear },
-              { label: "Quarter",      value: `Q${quarter}` },
-              { label: "Grade Level",  value: `Grade ${gradeLevel}` },
-              { label: "Section",      value: section },
+              { label: "File", value: fileName || "Grade_Sheet.xlsx" },
+              { label: "School Year", value: schoolYear },
+              { label: "Quarter", value: `Q${quarter}` },
+              { label: "Grade Level", value: `Grade ${gradeLevel}` },
+              { label: "Section", value: section },
               { label: "Rows to Encode", value: `${toEncode} rows` },
-              { label: "Rows to Skip",  value: toSkip > 0 ? `${toSkip} rows (errors)` : "None" },
+              { label: "Rows to Skip", value: toSkip > 0 ? `${toSkip} rows (errors)` : "None" },
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between py-2.5">
                 <p className="text-xs text-slate-500">{label}</p>
@@ -482,11 +489,28 @@ export default function NewImport() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
 
+  useHeader({
+    breadcrumbs: [
+      { label: "Grade Import", onClick: () => navigate(ROUTES.import.root) },
+      { label: "New Import" },
+    ],
+    extra: <StepIndicator step={step} />,
+    actions: (
+      <Button
+        size="sm" variant="outline"
+        className="h-8 text-xs gap-1.5"
+        onClick={() => navigate(-1)}
+      >
+        <X className="w-3.5 h-3.5" /> Cancel
+      </Button>
+    )
+  });
+
   // Step 1 state
-  const [driveUrl,   setDriveUrl]   = useState("");
-  const [section,    setSection]    = useState("");
+  const [driveUrl, setDriveUrl] = useState("");
+  const [section, setSection] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
-  const [quarter,    setQuarter]    = useState("");
+  const [quarter, setQuarter] = useState("");
   const [schoolYear, setSchoolYear] = useState("2025-2026");
 
   // Step 2 state
@@ -499,10 +523,10 @@ export default function NewImport() {
 
   function validateStep1(): boolean {
     const e: Record<string, string> = {};
-    if (!driveUrl.trim()) e.driveUrl   = "Please enter a Google Drive URL.";
-    if (!quarter)         e.quarter    = "Please select a quarter.";
-    if (!gradeLevel)      e.gradeLevel = "Please select a grade level.";
-    if (!section)         e.section    = "Please select a section.";
+    if (!driveUrl.trim()) e.driveUrl = "Please enter a Google Drive URL.";
+    if (!quarter) e.quarter = "Please select a quarter.";
+    if (!gradeLevel) e.gradeLevel = "Please select a grade level.";
+    if (!section) e.section = "Please select a section.";
     setStepErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -519,81 +543,53 @@ export default function NewImport() {
     }, 2000);
   }
 
+
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar
-        user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }}
-        onLogout={() => console.log("Logout")}
-      />
-
-      <main className="flex-1 overflow-y-auto">
-        {/* Top Bar */}
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-4 sticky top-0 z-10">
-          <div className="flex items-center gap-2">
-            <button onClick={() => navigate(ROUTES.import.root)} className="text-xs text-slate-400 hover:text-slate-600">
-              Grade Import
-            </button>
-            <ChevronRight className="w-3 h-3 text-slate-300" />
-            <span className="text-xs font-semibold text-slate-600">New Import</span>
+    <div className="p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-black text-slate-800">
+              {step === 1 ? "Select File" :
+                step === 2 ? "Map Columns" :
+                  step === 3 ? "Validate & Preview" :
+                    "Confirm & Encode"}
+            </h1>
+            <p className="text-sm text-slate-400 mt-0.5">Step {step} of 4</p>
           </div>
-          <div className="ml-4 flex-1">
-            <StepIndicator step={step} />
+          <div className="flex gap-2">
+            {step > 1 && (
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setStep((s) => s - 1)}>
+                Back
+              </Button>
+            )}
+            {step < 4 && (
+              <Button size="sm" className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800" onClick={handleNext}>
+                Next <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            )}
           </div>
-          <Button
-            size="sm" variant="outline"
-            className="h-8 text-xs gap-1.5"
-            onClick={() => navigate(-1)}
-          >
-            <X className="w-3.5 h-3.5" /> Cancel
-          </Button>
-        </header>
-
-        <div className="p-6 space-y-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-black text-slate-800">
-                {step === 1 ? "Select File" :
-                 step === 2 ? "Map Columns" :
-                 step === 3 ? "Validate & Preview" :
-                 "Confirm & Encode"}
-              </h1>
-              <p className="text-sm text-slate-400 mt-0.5">Step {step} of 4</p>
-            </div>
-            <div className="flex gap-2">
-              {step > 1 && (
-                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setStep((s) => s - 1)}>
-                  Back
-                </Button>
-              )}
-              {step < 4 && (
-                <Button size="sm" className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800" onClick={handleNext}>
-                  Next <ArrowRight className="w-3.5 h-3.5" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {step === 1 && (
-            <Step1
-              driveUrl={driveUrl} setDriveUrl={setDriveUrl}
-              section={section}   setSection={setSection}
-              gradeLevel={gradeLevel} setGradeLevel={setGradeLevel}
-              quarter={quarter}   setQuarter={setQuarter}
-              schoolYear={schoolYear} setSchoolYear={setSchoolYear}
-              errors={stepErrors}
-            />
-          )}
-          {step === 2 && <Step2 columnMaps={columnMaps} setColumnMaps={setColumnMaps} />}
-          {step === 3 && <Step3 rows={MOCK_PREVIEW} />}
-          {step === 4 && (
-            <Step4
-              section={section} gradeLevel={gradeLevel} quarter={quarter}
-              schoolYear={schoolYear} fileName="Grade_Sheet_8_Diligence_Q1.xlsx"
-              rows={MOCK_PREVIEW} onEncode={handleEncode} encoding={encoding}
-            />
-          )}
         </div>
-      </main>
-    </div>
+
+        {step === 1 && (
+          <Step1
+            driveUrl={driveUrl} setDriveUrl={setDriveUrl}
+            section={section} setSection={setSection}
+            gradeLevel={gradeLevel} setGradeLevel={setGradeLevel}
+            quarter={quarter} setQuarter={setQuarter}
+            schoolYear={schoolYear} setSchoolYear={setSchoolYear}
+            errors={stepErrors}
+          />
+        )}
+        {step === 2 && <Step2 columnMaps={columnMaps} setColumnMaps={setColumnMaps} />}
+        {step === 3 && <Step3 rows={MOCK_PREVIEW} />}
+        {step === 4 && (
+          <Step4
+            section={section} gradeLevel={gradeLevel} quarter={quarter}
+            schoolYear={schoolYear} fileName="Grade_Sheet_8_Diligence_Q1.xlsx"
+            rows={MOCK_PREVIEW} onEncode={handleEncode} encoding={encoding}
+          />
+        )}
+      </div>
+
   );
 }

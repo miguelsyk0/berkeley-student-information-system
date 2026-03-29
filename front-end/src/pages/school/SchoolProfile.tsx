@@ -4,8 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import Sidebar from "@/components/sidebar";
+
 import { getSchoolProfile, updateSchoolProfile, type School } from "@/services/api";
+import { useHeader } from "@/contexts/HeaderContext";
+import React from "react";
 
 // ── Field Row ──────────────────────────────────────────────────────────────────
 
@@ -98,105 +100,87 @@ export default function SchoolProfile() {
 
   if (loading) {
     return (
-      <div className="flex h-screen bg-slate-50 overflow-hidden">
-        <Sidebar
-          user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }}
-          onLogout={() => console.log("Logout")}
-        />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto"></div>
-            <p className="text-sm text-slate-500 mt-2">Loading school profile...</p>
-          </div>
-        </main>
+      <div className="flex-1 flex items-center justify-center p-20">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto"></div>
+          <p className="text-sm text-slate-500 mt-2">Loading school profile...</p>
+        </div>
       </div>
     );
   }
 
   if (!school) {
     return (
-      <div className="flex h-screen bg-slate-50 overflow-hidden">
-        <Sidebar
-          user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }}
-          onLogout={() => console.log("Logout")}
-        />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-slate-500">Failed to load school profile</p>
-          </div>
-        </main>
+      <div className="flex-1 flex items-center justify-center p-20">
+        <div className="text-center">
+          <p className="text-slate-500">Failed to load school profile</p>
+        </div>
       </div>
     );
   }
 
+  useHeader({
+    breadcrumbs: [
+      { label: "School & Sections" },
+      { label: "School Profile" },
+    ],
+    actions: (
+      <div className="flex gap-2">
+        {editing ? (
+          <>
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={handleCancel} disabled={saving}>
+              <X className="w-3.5 h-3.5" /> Cancel
+            </Button>
+            <Button size="sm" className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800" onClick={handleSave} disabled={saving}>
+              <Save className="w-3.5 h-3.5" /> {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </>
+        ) : (
+          <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => setEditing(true)}>
+            <Pencil className="w-3.5 h-3.5" /> Edit Profile
+          </Button>
+        )}
+      </div>
+    )
+  });
+
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar
-        user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }}
-        onLogout={() => console.log("Logout")}
-      />
-
-      <main className="flex-1 overflow-y-auto">
-        {/* Top Bar */}
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
-          <span className="text-xs text-slate-400">School & Sections</span>
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span className="text-xs font-semibold text-slate-600">School Profile</span>
-          <div className="ml-auto flex gap-2">
-            {editing ? (
-              <>
-                <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={handleCancel} disabled={saving}>
-                  <X className="w-3.5 h-3.5" /> Cancel
-                </Button>
-                <Button size="sm" className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800" onClick={handleSave} disabled={saving}>
-                  <Save className="w-3.5 h-3.5" /> {saving ? "Saving..." : "Save Changes"}
-                </Button>
-              </>
-            ) : (
-              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => setEditing(true)}>
-                <Pencil className="w-3.5 h-3.5" /> Edit Profile
-              </Button>
-            )}
-          </div>
-        </header>
-
-        <div className="p-6 max-w-3xl">
-          {/* Page Title */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-black text-slate-800">School Profile</h1>
-            <p className="text-sm text-slate-400 mt-0.5">Manage your school's official information used across the system and in SF10 documents.</p>
-          </div>
-
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-0 pt-5 px-6">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-black text-slate-700 flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-teal-500" />
-                  School Information
-                </CardTitle>
-                {editing && (
-                  <Badge className="bg-teal-50 text-teal-600 text-[10px] border-teal-200 border">
-                    Editing
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-
-            <CardContent className="px-6 pb-6 divide-y divide-slate-100">
-              <FieldRow label="School Name" value={draft.name || ''} name="name" editing={editing} onChange={handleChange} icon={Building2} />
-              <FieldRow label="District" value={draft.district || ''} name="district" editing={editing} onChange={handleChange} icon={MapPin} />
-              <FieldRow label="Division" value={draft.division || ''} name="division" editing={editing} onChange={handleChange} icon={MapPin} />
-              <FieldRow label="Region" value={draft.region || ''} name="region" editing={editing} onChange={handleChange} icon={Globe} />
-              <FieldRow label="Complete Address" value={draft.address || ''} name="address" editing={editing} onChange={handleChange} icon={MapPin} />
-            </CardContent>
-          </Card>
-
-          <p className="text-[11px] text-slate-400 mt-4 flex items-center gap-1.5">
-            <span className="w-1 h-1 rounded-full bg-slate-300 inline-block" />
-            This information appears on all generated SF10 documents.
-          </p>
+    <div className="p-6 max-w-3xl">
+        {/* Page Title */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-black text-slate-800">School Profile</h1>
+          <p className="text-sm text-slate-400 mt-0.5">Manage your school's official information used across the system and in SF10 documents.</p>
         </div>
-      </main>
-    </div>
+
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-0 pt-5 px-6">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-black text-slate-700 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-teal-500" />
+                School Information
+              </CardTitle>
+              {editing && (
+                <Badge className="bg-teal-50 text-teal-600 text-[10px] border-teal-200 border">
+                  Editing
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+
+          <CardContent className="px-6 pb-6 divide-y divide-slate-100">
+            <FieldRow label="School Name" value={draft.name || ''} name="name" editing={editing} onChange={handleChange} icon={Building2} />
+            <FieldRow label="District" value={draft.district || ''} name="district" editing={editing} onChange={handleChange} icon={MapPin} />
+            <FieldRow label="Division" value={draft.division || ''} name="division" editing={editing} onChange={handleChange} icon={MapPin} />
+            <FieldRow label="Region" value={draft.region || ''} name="region" editing={editing} onChange={handleChange} icon={Globe} />
+            <FieldRow label="Complete Address" value={draft.address || ''} name="address" editing={editing} onChange={handleChange} icon={MapPin} />
+          </CardContent>
+        </Card>
+
+        <p className="text-[11px] text-slate-400 mt-4 flex items-center gap-1.5">
+          <span className="w-1 h-1 rounded-full bg-slate-300 inline-block" />
+          This information appears on all generated SF10 documents.
+        </p>
+      </div>
+
   );
 }

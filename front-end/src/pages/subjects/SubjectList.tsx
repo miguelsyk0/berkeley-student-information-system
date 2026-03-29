@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Plus, ChevronRight, Pencil, Trash2,
+  Plus, Pencil, Trash2,
   Search, BookMarked, MoreHorizontal,
   ArrowUp, ArrowDown,
 } from "lucide-react";
@@ -19,11 +19,10 @@ import {
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
-import Sidebar from "@/components/sidebar";
 import { ROUTES } from "@/routes";
 import { getSubjects } from "@/services/api";
+import { useHeader } from "@/contexts/HeaderContext";
 import type { Subject } from "../types";
-
 
 // ── Subject Row ────────────────────────────────────────────────────────────────
 
@@ -156,7 +155,7 @@ function SubjectRow({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+      </>
   );
 }
 
@@ -164,7 +163,7 @@ function SubjectRow({
 
 export default function SubjectList() {
   const navigate = useNavigate();
-  const [subjects, setSubjects] = useState<any[]>([]); // Using any since Subject might not exist locally
+  const [subjects, setSubjects] = useState<any[]>([]); 
   const [search, setSearch] = useState("");
   const [filterMapeh, setFilterMapeh] = useState<"all" | "mapeh" | "regular">("all");
 
@@ -179,8 +178,8 @@ export default function SubjectList() {
         (s.displayName?.toLowerCase()?.includes(search.toLowerCase()) ?? false);
       const matchMapeh =
         filterMapeh === "all" ? true :
-        filterMapeh === "mapeh" ? s.isMapeh :
-        !s.isMapeh;
+          filterMapeh === "mapeh" ? s.isMapeh :
+            !s.isMapeh;
       return matchSearch && matchMapeh;
     })
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -190,9 +189,7 @@ export default function SubjectList() {
   }
 
   async function handleToggleActive(id: number) {
-    // Optimistic toggle
     setSubjects((prev) => prev.map((s) => s.id === id ? { ...s, isActive: !s.isActive } : s));
-    // Provide actual API call here in production
   }
 
   function handleMoveUp(id: number) {
@@ -218,120 +215,98 @@ export default function SubjectList() {
   }
 
   const activeCount = subjects.filter((s) => s.isActive).length;
-  const mapehCount  = subjects.filter((s) => s.isMapeh).length;
+  const mapehCount = subjects.filter((s) => s.isMapeh).length;
+
+  useHeader({
+    title: "Subjects",
+    subtitle: `${subjects.length} subjects · ${activeCount} active · ${mapehCount} MAPEH`,
+    breadcrumbs: [
+      { label: "Subjects" },
+      { label: "Subject List" },
+    ],
+    actions: (
+      <Button
+        size="sm"
+        className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
+        onClick={() => navigate(ROUTES.subjects.add)}
+      >
+        <Plus className="w-3.5 h-3.5" /> Add Subject
+      </Button>
+    )
+  });
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar
-        user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }}
-        onLogout={() => console.log("Logout")}
-      />
-
-      <main className="flex-1 overflow-y-auto">
-        {/* Top Bar */}
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
-          <span className="text-xs text-slate-400">Subjects</span>
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span className="text-xs font-semibold text-slate-600">Subject List</span>
-          <div className="ml-auto">
-            <Button
-              size="sm"
-              className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
-              onClick={() => navigate(ROUTES.subjects.add)}
-            >
-              <Plus className="w-3.5 h-3.5" /> Add Subject
-            </Button>
+    <div className="p-6 space-y-4">
+        {/* Filters */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-48 max-w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <Input
+              placeholder="Search by code, name, or SF10 name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-8 text-xs bg-white border-slate-200"
+            />
           </div>
-        </header>
-
-        <div className="p-6 space-y-4">
-          {/* Title + summary */}
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-2xl font-black text-slate-800">Subjects</h1>
-              <p className="text-sm text-slate-400 mt-0.5">
-                {subjects.length} subjects
-                <span className="mx-1.5 text-slate-300">·</span>
-                <span className="text-emerald-600 font-medium">{activeCount} active</span>
-                <span className="mx-1.5 text-slate-300">·</span>
-                <span className="text-violet-600 font-medium">{mapehCount} MAPEH sub-subjects</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-48 max-w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <Input
-                placeholder="Search by code, name, or SF10 name..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-8 text-xs bg-white border-slate-200"
-              />
-            </div>
-            <div className="flex gap-1 bg-white rounded-lg border border-slate-200 p-1">
-              {(["all", "regular", "mapeh"] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilterMapeh(f)}
-                  className={`px-3 py-1 rounded text-xs font-semibold transition-colors capitalize ${
-                    filterMapeh === f
-                      ? "bg-teal-600 text-white"
-                      : "text-slate-500 hover:text-slate-700"
+          <div className="flex gap-1 bg-white rounded-lg border border-slate-200 p-1">
+            {(["all", "regular", "mapeh"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilterMapeh(f)}
+                className={`px-3 py-1 rounded text-xs font-semibold transition-colors capitalize ${filterMapeh === f
+                    ? "bg-teal-600 text-white"
+                    : "text-slate-500 hover:text-slate-700"
                   }`}
-                >
-                  {f === "all" ? "All" : f === "regular" ? "Regular" : "MAPEH"}
-                </button>
-              ))}
-            </div>
+              >
+                {f === "all" ? "All" : f === "regular" ? "Regular" : "MAPEH"}
+              </button>
+            ))}
           </div>
-
-          {/* Table */}
-          <Card className="border-0 shadow-sm overflow-hidden">
-            {filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <BookMarked className="w-10 h-10 mb-3 opacity-30" />
-                <p className="text-sm font-semibold">No subjects found</p>
-              </div>
-            ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/80">
-                    <th className="px-3 py-3 w-16" />
-                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Code</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Subject Name</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">SF10 Display Name</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">MAPEH</th>
-                    <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Active</th>
-                    <th className="px-4 py-3 w-12" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((subject, idx) => (
-                    <SubjectRow
-                      key={subject.id}
-                      subject={subject}
-                      isFirst={idx === 0}
-                      isLast={idx === filtered.length - 1}
-                      onEdit={(s) => navigate(ROUTES.subjects.edit(s.id), { state: { subject: s } })}
-                      onDelete={handleDelete}
-                      onToggleActive={handleToggleActive}
-                      onMoveUp={handleMoveUp}
-                      onMoveDown={handleMoveDown}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Card>
-
-          <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
-            <span className="w-1 h-1 rounded-full bg-slate-300 inline-block" />
-            Use the arrows to reorder subjects. Order affects how columns appear in the grade sheet.
-          </p>
         </div>
-      </main>
+
+        {/* Table */}
+        <Card className="border-0 shadow-sm overflow-hidden">
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+              <BookMarked className="w-10 h-10 mb-3 opacity-30" />
+              <p className="text-sm font-semibold">No subjects found</p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/80">
+                  <th className="px-3 py-3 w-16" />
+                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Code</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Subject Name</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">SF10 Display Name</th>
+                  <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">MAPEH</th>
+                  <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Active</th>
+                  <th className="px-4 py-3 w-12" />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((subject, idx) => (
+                  <SubjectRow
+                    key={subject.id}
+                    subject={subject}
+                    isFirst={idx === 0}
+                    isLast={idx === filtered.length - 1}
+                    onEdit={(s) => navigate(ROUTES.subjects.edit(s.id), { state: { subject: s } })}
+                    onDelete={handleDelete}
+                    onToggleActive={handleToggleActive}
+                    onMoveUp={handleMoveUp}
+                    onMoveDown={handleMoveDown}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+
+        <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+          <span className="w-1 h-1 rounded-full bg-slate-300 inline-block" />
+          Use the arrows to reorder subjects. Order affects how columns appear in the grade sheet.
+        </p>
     </div>
   );
 }

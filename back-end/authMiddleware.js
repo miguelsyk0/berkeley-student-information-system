@@ -16,8 +16,12 @@ async function authMiddleware(req, res, next) {
     req.user = decodedToken;
     next();
   } catch (error) {
-    console.error("Token verification failed:", error.message);
-    res.status(401).json({ error: "Unauthorized: Token verification failed" });
+    console.error("Auth Error:", error.message);
+    res.status(401).json({
+      error: "Unauthorized: Token verification failed",
+      details: error.message,
+      code: error.code
+    });
   }
 }
 

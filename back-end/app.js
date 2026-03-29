@@ -32,17 +32,47 @@ app.use("/api", gradesRouter);
 app.use("/api", sf10Router);
 app.use("/api", studentsRouter);
 
+// Health check endpoint (Public)
+app.get("/api/health", async (req, res) => {
+  try {
+    const db = require("./db");
+    // Simple query to verify DB connectivity
+    await db.one("SELECT 1 as connected");
+    res.json({ 
+      status: "ok", 
+      database: "connected",
+      timestamp: new Date().toISOString(),
+      env: process.env.NODE_ENV || "development"
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      status: "error", 
+      database: "disconnected", 
+      message: err.message 
+    });
+  }
+});
+
 app.get("/", (req, res) => {
   res.send("Back-end running via Firebase Functions");
 });
 
 // For local development compatibility outside of Firebase emulator
-if (process.env.NODE_ENV !== "production") {
+if (require.main === module) {
   const port = process.env.PORT || 4000;
   app.listen(port, () => {
     console.log(`Local development server listening on port ${port}`);
   });
 }
 
-// Export the Express API as a Firebase Cloud Function
-exports.api = functions.https.onRequest(app);
+exports.api = functions
+  .region("asia-southeast1")
+  .runWith({
+    timeoutSeconds: 120,
+    memory: "1GB"
+  })
+  .https.onRequest((req, res) => {
+    // Force production environment in Cloud Function context
+    process.env.NODE_ENV = "production";
+    return app(req, res);
+  });

@@ -37,9 +37,19 @@ export interface Section {
 
 export interface Teacher {
   id: number;
-  name: string;
-  email: string;
   employeeId: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  suffix?: string;
+  gender?: string;
+  birthdate?: string;
+  contactNumber?: string;
+  email?: string;
+  specialization?: string;
+  isActive: boolean;
+  name?: string; // Concatenated name from server if available
+  userId?: string;
 }
 
 export async function getSchoolProfile(): Promise<School> {
@@ -135,11 +145,39 @@ export async function getTeachers(): Promise<Teacher[]> {
   return res.json();
 }
 
-export async function assignSectionAdviser(sectionId: number, teacherId: number | null): Promise<{ result: string }> {
+export async function createTeacher(data: Partial<Teacher>): Promise<Teacher> {
+  const res = await authFetch(`${BASE_URL}/teachers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateTeacher(id: number, data: Partial<Teacher>): Promise<Teacher> {
+  const res = await authFetch(`${BASE_URL}/teachers/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteTeacher(id: number): Promise<{ message: string }> {
+  const res = await authFetch(`${BASE_URL}/teachers/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function assignSectionAdviser(sectionId: number, teacherId: number | null): Promise<Section> {
   const res = await authFetch(`${BASE_URL}/sections/${sectionId}/adviser`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ teacherId }),
+    body: JSON.stringify({ adviserId: teacherId }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -153,18 +191,38 @@ export interface Student {
   firstName: string;
   middleName?: string;
   lastName: string;
-  nameExtension?: string;
-  sex: "Male" | "Female";
+  suffix?: string;
+  gender: "Male" | "Female";
   birthdate: string;
-  elementarySchoolName?: string;
-  elementarySchoolId?: string;
-  elementarySchoolAddress?: string;
-  elementaryGeneralAvg?: number;
-  elementaryCitation?: string;
-  otherCredential?: string;
-  otherCredentialRating?: string;
-  credentialExamDate?: string;
-  credentialTestingCenter?: string;
+  birthPlace?: string;
+  nationality?: string;
+  religion?: string;
+  motherTongue?: string;
+  address?: string;
+  barangay?: string;
+  municipality?: string;
+  province?: string;
+  fatherName?: string;
+  motherName?: string;
+  guardianName?: string;
+  guardianRelationship?: string;
+  contactNumber?: string;
+  // Elementary Info
+  elemSchoolName?: string;
+  elemSchoolId?: string;
+  elemSchoolAddress?: string;
+  elemPeptPasser?: boolean;
+  elemPeptDate?: string;
+  elemAlsAePasser?: boolean;
+  elemAlsAeDate?: string;
+  elemCompletionDate?: string;
+  elemGenAverage?: number;
+  elemCitation?: string;
+  // Alternative Credentials
+  altCredentialType?: string;
+  altCredentialRating?: string;
+  altCredentialExamDate?: string;
+  altCredentialCenter?: string;
 }
 
 export interface Enrollment {
@@ -198,14 +256,14 @@ export async function getStudents(filters?: {
   grade?: string;
   section?: string;
   year?: string;
-  sex?: string;
+  gender?: string;
   search?: string;
 }): Promise<Student[]> {
   const params = new URLSearchParams();
   if (filters?.grade) params.append("grade", filters.grade);
   if (filters?.section) params.append("section", filters.section);
   if (filters?.year) params.append("year", filters.year);
-  if (filters?.sex) params.append("sex", filters.sex);
+  if (filters?.gender) params.append("gender", filters.gender);
   if (filters?.search) params.append("search", filters.search);
 
   const res = await authFetch(`${BASE_URL}/students?${params}`);
@@ -213,7 +271,7 @@ export async function getStudents(filters?: {
   return res.json();
 }
 
-export async function addStudent(studentData: Partial<Student>): Promise<{ result: string; id: number }> {
+export async function createStudent(studentData: Partial<Student>): Promise<{ result: string; id: number }> {
   const res = await authFetch(`${BASE_URL}/students`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

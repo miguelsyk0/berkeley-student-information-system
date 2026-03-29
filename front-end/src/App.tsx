@@ -14,7 +14,6 @@ import SchoolYearList    from "@/pages/school/SchoolYearList";
 import SectionList       from "@/pages/school/SectionList";
 import AdviserAssignment from "@/pages/school/AdviserAssignment";
 
-// ── Students ───────────────────────────────────────────────────────────────────
 import StudentList    from "@/pages/students/StudentList";
 import StudentProfile from "@/pages/students/StudentProfile";
 import StudentForm    from "@/pages/students/StudentForm";
@@ -39,6 +38,7 @@ import GeneralAverageView from "@/pages/encoding/GeneralAverageView";
 import SF10Home            from "@/pages/sf10/SF10Home";
 import SingleStudentSF10   from "@/pages/sf10/SingleStudentSF10";
 import BulkSF10Generation  from "@/pages/sf10/BulkSF10Generation";
+import MainLayout           from "@/components/MainLayout";
 
 // ── Protected Route ────────────────────────────────────────────────────────────
 
@@ -79,6 +79,7 @@ export default function App() {
 
           {/* ── Protected routes ── */}
           <Route element={<ProtectedRoute />}>
+            <Route element={<MainLayout />}>
 
             {/* ── Dashboard ── */}
             <Route path="/dashboard" element={<Dashboard />} />
@@ -133,6 +134,7 @@ export default function App() {
               <Route path="bulk"                    element={<BulkSF10Generation />} />
             </Route>
 
+            </Route>
           </Route>
 
           {/* ── 404 fallback ── */}

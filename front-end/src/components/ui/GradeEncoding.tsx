@@ -35,22 +35,22 @@ interface StudentGrade {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const SUBJECTS: Subject[] = [
-  { code: "LA",   name: "Logical Analysis",         shortName: "LA"   },
-  { code: "SCI",  name: "Science Lab",               shortName: "SCI"  },
-  { code: "MATH", name: "Math Lab",                  shortName: "MATH" },
-  { code: "SL",   name: "Social Literacy",           shortName: "SL"   },
-  { code: "EL",   name: "English Lab",               shortName: "EL"   },
-  { code: "WP",   name: "Wika at Pagpapakatao",      shortName: "WP"   },
-  { code: "MAP",  name: "Psychomotor",               shortName: "MAP"  },
-  { code: "TLE",  name: "TLE",                       shortName: "TLE"  },
-  { code: "MSE",  name: "MSE",                       shortName: "MSE"  },
-  { code: "COD",  name: "Coding",                    shortName: "COD"  },
+  { code: "LA", name: "Logical Analysis", shortName: "LA" },
+  { code: "SCI", name: "Science Lab", shortName: "SCI" },
+  { code: "MATH", name: "Math Lab", shortName: "MATH" },
+  { code: "SL", name: "Social Literacy", shortName: "SL" },
+  { code: "EL", name: "English Lab", shortName: "EL" },
+  { code: "WP", name: "Wika at Pagpapakatao", shortName: "WP" },
+  { code: "MAP", name: "Psychomotor", shortName: "MAP" },
+  { code: "TLE", name: "TLE", shortName: "TLE" },
+  { code: "MSE", name: "MSE", shortName: "MSE" },
+  { code: "COD", name: "Coding", shortName: "COD" },
 ];
 
 const GRADE_COLORS: Record<number, string> = {
-  7:  "bg-violet-100 text-violet-800",
-  8:  "bg-teal-100 text-teal-800",
-  9:  "bg-amber-100 text-amber-800",
+  7: "bg-violet-100 text-violet-800",
+  8: "bg-teal-100 text-teal-800",
+  9: "bg-amber-100 text-amber-800",
   10: "bg-rose-100 text-rose-800",
 };
 
@@ -133,9 +133,9 @@ export function GradeEncodingHome({ onNavigate }: { onNavigate: (page: string, p
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => {}} />
+      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => { }} />
       <main className="flex-1 overflow-y-auto">
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
+        <header className="h-32 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
           <span className="text-xs text-slate-400">Grade Encoding</span>
           <ChevronRight className="w-3 h-3 text-slate-300" />
           <span className="text-xs font-semibold text-slate-600">Home</span>
@@ -187,14 +187,14 @@ export function GradeEncodingHome({ onNavigate }: { onNavigate: (page: string, p
             <Select value={quarter} onValueChange={setQuarter}>
               <SelectTrigger className="h-8 w-28 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {[1,2,3,4].map(q => <SelectItem key={q} value={String(q)}>Quarter {q}</SelectItem>)}
+                {[1, 2, 3, 4].map(q => <SelectItem key={q} value={String(q)}>Quarter {q}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={gradeLevel} onValueChange={setGradeLevel}>
               <SelectTrigger className="h-8 w-32 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Grades</SelectItem>
-                {[7,8,9,10].map(g => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}
+                {[7, 8, 9, 10].map(g => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -302,9 +302,9 @@ export function ClassGradeSheet({ onNavigate }: { onNavigate: (page: string, par
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => {}} />
+      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => { }} />
       <main className="flex-1 overflow-y-auto">
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
+        <header className="h-32 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
           <button onClick={() => onNavigate("grade-home")} className="text-xs text-slate-400 hover:text-slate-600">
             Grade Encoding
           </button>
@@ -353,7 +353,7 @@ export function ClassGradeSheet({ onNavigate }: { onNavigate: (page: string, par
             <Select value={gradeLevel} onValueChange={setGradeLevel}>
               <SelectTrigger className="h-8 w-28 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {[7,8,9,10].map(g => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}
+                {[7, 8, 9, 10].map(g => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={section} onValueChange={setSection}>
@@ -365,7 +365,7 @@ export function ClassGradeSheet({ onNavigate }: { onNavigate: (page: string, par
             <Select value={quarter} onValueChange={setQuarter}>
               <SelectTrigger className="h-8 w-28 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {[1,2,3,4].map(q => <SelectItem key={q} value={String(q)}>Quarter {q}</SelectItem>)}
+                {[1, 2, 3, 4].map(q => <SelectItem key={q} value={String(q)}>Quarter {q}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -539,9 +539,9 @@ export function StudentGradeView({ onNavigate }: { onNavigate: (page: string, pa
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => {}} />
+      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => { }} />
       <main className="flex-1 overflow-y-auto">
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
+        <header className="h-32 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
           <button onClick={() => onNavigate("grade-home")} className="text-xs text-slate-400 hover:text-slate-600">Grade Encoding</button>
           <ChevronRight className="w-3 h-3 text-slate-300" />
           <span className="text-xs font-semibold text-slate-600">Student Grade View</span>
@@ -619,12 +619,11 @@ export function StudentGradeView({ onNavigate }: { onNavigate: (page: string, pa
             <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm w-fit">
               {[
                 { key: "quarterly", label: "Quarterly Grades", icon: ClipboardList },
-                { key: "final",     label: "Final Grades",     icon: TrendingUp },
+                { key: "final", label: "Final Grades", icon: TrendingUp },
               ].map(t => (
                 <button key={t.key} onClick={() => setTab(t.key as any)}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                    tab === t.key ? "bg-teal-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                  }`}>
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${tab === t.key ? "bg-teal-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                    }`}>
                   <t.icon className="w-3.5 h-3.5" />
                   {t.label}
                 </button>
@@ -638,7 +637,7 @@ export function StudentGradeView({ onNavigate }: { onNavigate: (page: string, pa
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
                       <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Subject</th>
-                      {[1,2,3,4].map(q => (
+                      {[1, 2, 3, 4].map(q => (
                         <th key={q} className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Q{q}</th>
                       ))}
                     </tr>
@@ -650,7 +649,7 @@ export function StudentGradeView({ onNavigate }: { onNavigate: (page: string, pa
                           <p className="text-xs font-semibold text-slate-700">{subj.name}</p>
                           <p className="text-[10px] text-slate-400">{subj.code}</p>
                         </td>
-                        {[1,2,3,4].map(q => {
+                        {[1, 2, 3, 4].map(q => {
                           const v = QUARTERLY_MOCK[subj.code]?.[q];
                           return (
                             <td key={q} className="px-4 py-3 text-center">
@@ -683,7 +682,7 @@ export function StudentGradeView({ onNavigate }: { onNavigate: (page: string, pa
                   </thead>
                   <tbody>
                     {SUBJECTS.map(subj => {
-                      const qs = [1,2,3,4].map(q => QUARTERLY_MOCK[subj.code]?.[q] ?? null);
+                      const qs = [1, 2, 3, 4].map(q => QUARTERLY_MOCK[subj.code]?.[q] ?? null);
                       const validQs = qs.filter((v): v is number => v !== null);
                       const final = validQs.length === 4 ? Math.round(validQs.reduce((a, b) => a + b) / 4 * 100) / 100 : null;
                       const passed = final !== null && final >= 75;
@@ -710,8 +709,8 @@ export function StudentGradeView({ onNavigate }: { onNavigate: (page: string, pa
                             {final === null
                               ? <span className="text-xs text-slate-400">Incomplete</span>
                               : passed
-                              ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                              : <span className="text-xs font-bold text-red-500">Failed</span>
+                                ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
+                                : <span className="text-xs font-bold text-red-500">Failed</span>
                             }
                           </td>
                         </tr>
@@ -746,9 +745,9 @@ export function GeneralAverageView({ onNavigate }: { onNavigate: (page: string, 
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => {}} />
+      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => { }} />
       <main className="flex-1 overflow-y-auto">
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
+        <header className="h-32 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
           <button onClick={() => onNavigate("grade-home")} className="text-xs text-slate-400 hover:text-slate-600">Grade Encoding</button>
           <ChevronRight className="w-3 h-3 text-slate-300" />
           <span className="text-xs font-semibold text-slate-600">General Average</span>
@@ -782,7 +781,7 @@ export function GeneralAverageView({ onNavigate }: { onNavigate: (page: string, 
               <SelectTrigger className="h-8 w-32 text-xs border-slate-200 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Quarters</SelectItem>
-                {[1,2,3,4].map(q => <SelectItem key={q} value={String(q)}>Quarter {q}</SelectItem>)}
+                {[1, 2, 3, 4].map(q => <SelectItem key={q} value={String(q)}>Quarter {q}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -792,7 +791,7 @@ export function GeneralAverageView({ onNavigate }: { onNavigate: (page: string, 
             {[
               { label: "Class Average", value: classAvg.toFixed(2), color: "text-teal-700", bg: "bg-teal-50" },
               { label: "Highest", value: students[0]?.avg?.toFixed(2) ?? "—", color: "text-emerald-700", bg: "bg-emerald-50" },
-              { label: "Lowest", value: students[students.length-1]?.avg?.toFixed(2) ?? "—", color: "text-red-600", bg: "bg-red-50" },
+              { label: "Lowest", value: students[students.length - 1]?.avg?.toFixed(2) ?? "—", color: "text-red-600", bg: "bg-red-50" },
               { label: "Passing", value: `${students.filter(s => (s.avg ?? 0) >= 75).length}/${students.length}`, color: "text-slate-700", bg: "bg-white" },
             ].map(({ label, value, color, bg }) => (
               <Card key={label} className={`border-0 shadow-sm ${bg}`}>
@@ -877,9 +876,9 @@ export function SF10Home({ onNavigate }: { onNavigate: (page: string, params?: a
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => {}} />
+      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => { }} />
       <main className="flex-1 overflow-y-auto">
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
+        <header className="h-32 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
           <span className="text-xs text-slate-400">SF10 Generation</span>
           <ChevronRight className="w-3 h-3 text-slate-300" />
           <span className="text-xs font-semibold text-slate-600">Home</span>
@@ -1107,7 +1106,7 @@ function SF10FrontPage({ student }: { student: StudentGrade }) {
           </thead>
           <tbody>
             {SUBJECTS.map(subj => {
-              const qs = [1,2,3,4].map(q => QUARTERLY_MOCK[subj.code]?.[q] ?? null);
+              const qs = [1, 2, 3, 4].map(q => QUARTERLY_MOCK[subj.code]?.[q] ?? null);
               const validQs = qs.filter((v): v is number => v !== null);
               const final = validQs.length >= 2 ? Math.round(validQs.reduce((a, b) => a + b) / validQs.length) : null;
               return (
@@ -1125,11 +1124,11 @@ function SF10FrontPage({ student }: { student: StudentGrade }) {
             })}
             <tr className="bg-slate-100 font-bold">
               <td className="border border-slate-300 px-2 py-2 font-black text-slate-700">General Average</td>
-              {[1,2,3,4].map(q => (
+              {[1, 2, 3, 4].map(q => (
                 <td key={q} className="border border-slate-300 px-2 py-2 text-center text-slate-700">
                   {(() => {
                     const vals = SUBJECTS.map(s => QUARTERLY_MOCK[s.code]?.[q]).filter((v): v is number => v !== null);
-                    return vals.length > 0 ? (vals.reduce((a,b) => a+b,0)/vals.length).toFixed(0) : "—";
+                    return vals.length > 0 ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(0) : "—";
                   })()}
                 </td>
               ))}
@@ -1161,9 +1160,9 @@ export function SingleStudentSF10({ onNavigate }: { onNavigate: (page: string, p
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => {}} />
+      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => { }} />
       <main className="flex-1 overflow-y-auto">
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
+        <header className="h-32 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
           <button onClick={() => onNavigate("sf10-home")} className="text-xs text-slate-400 hover:text-slate-600">SF10</button>
           <ChevronRight className="w-3 h-3 text-slate-300" />
           <span className="text-xs font-semibold text-slate-600">{student.name}</span>
@@ -1213,15 +1212,15 @@ export function SingleStudentSF10({ onNavigate }: { onNavigate: (page: string, p
                         <thead>
                           <tr className="bg-slate-100">
                             <th className="border border-slate-300 px-2 py-1.5 text-left font-bold text-slate-700">Learning Areas</th>
-                            {["Q1","Q2","Q3","Q4"].map(q => <th key={q} className="border border-slate-300 px-2 py-1.5 text-center font-bold text-slate-700">{q}</th>)}
+                            {["Q1", "Q2", "Q3", "Q4"].map(q => <th key={q} className="border border-slate-300 px-2 py-1.5 text-center font-bold text-slate-700">{q}</th>)}
                             <th className="border border-slate-300 px-2 py-1.5 text-center font-bold text-slate-700">Final</th>
                             <th className="border border-slate-300 px-2 py-1.5 text-center font-bold text-slate-700">Rem.</th>
                           </tr>
                         </thead>
                         <tbody>
                           {SUBJECTS.map(subj => {
-                            const fakeQs = [1,2,3,4].map(() => Math.round(78 + Math.random() * 20));
-                            const final = Math.round(fakeQs.reduce((a,b) => a+b,0)/4);
+                            const fakeQs = [1, 2, 3, 4].map(() => Math.round(78 + Math.random() * 20));
+                            const final = Math.round(fakeQs.reduce((a, b) => a + b, 0) / 4);
                             return (
                               <tr key={subj.code} className="hover:bg-slate-50">
                                 <td className="border border-slate-200 px-2 py-1.5 font-medium text-slate-700">{subj.name}</td>
@@ -1283,9 +1282,9 @@ export function BulkSF10Generation({ onNavigate }: { onNavigate: (page: string, 
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => {}} />
+      <Sidebar user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }} onLogout={() => { }} />
       <main className="flex-1 overflow-y-auto">
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
+        <header className="h-32 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
           <button onClick={() => onNavigate("sf10-home")} className="text-xs text-slate-400 hover:text-slate-600">SF10</button>
           <ChevronRight className="w-3 h-3 text-slate-300" />
           <span className="text-xs font-semibold text-slate-600">Bulk Generation</span>
@@ -1321,7 +1320,7 @@ export function BulkSF10Generation({ onNavigate }: { onNavigate: (page: string, 
                 <Select value={gradeLevel} onValueChange={setGradeLevel} disabled={generating}>
                   <SelectTrigger className="h-9 text-sm border-slate-200"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {[7,8,9,10].map(g => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}
+                    {[7, 8, 9, 10].map(g => <SelectItem key={g} value={String(g)}>Grade {g}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -1432,13 +1431,13 @@ export default function App() {
 
   // Demo nav rail
   const navItems = [
-    { key: "grade-home",       label: "Grade Home" },
+    { key: "grade-home", label: "Grade Home" },
     { key: "class-grade-sheet", label: "Class Grade Sheet" },
     { key: "student-grade-view", label: "Student Grade View" },
-    { key: "general-average",  label: "General Average" },
-    { key: "sf10-home",        label: "SF10 Home" },
-    { key: "sf10-student",     label: "Single SF10" },
-    { key: "sf10-bulk",        label: "Bulk SF10" },
+    { key: "general-average", label: "General Average" },
+    { key: "sf10-home", label: "SF10 Home" },
+    { key: "sf10-student", label: "Single SF10" },
+    { key: "sf10-bulk", label: "Bulk SF10" },
   ];
 
   return (
@@ -1447,21 +1446,20 @@ export default function App() {
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 rounded-2xl shadow-2xl px-3 py-2 flex gap-1">
         {navItems.map(n => (
           <button key={n.key} onClick={() => navigate(n.key)}
-            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors whitespace-nowrap ${
-              page === n.key ? "bg-teal-500 text-white" : "text-slate-400 hover:text-white hover:bg-slate-700"
-            }`}>
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors whitespace-nowrap ${page === n.key ? "bg-teal-500 text-white" : "text-slate-400 hover:text-white hover:bg-slate-700"
+              }`}>
             {n.label}
           </button>
         ))}
       </div>
 
-      {page === "grade-home"        && <GradeEncodingHome onNavigate={navigate} />}
+      {page === "grade-home" && <GradeEncodingHome onNavigate={navigate} />}
       {page === "class-grade-sheet" && <ClassGradeSheet onNavigate={navigate} />}
-      {page === "student-grade-view"&& <StudentGradeView onNavigate={navigate} />}
-      {page === "general-average"   && <GeneralAverageView onNavigate={navigate} />}
-      {page === "sf10-home"         && <SF10Home onNavigate={navigate} />}
-      {page === "sf10-student"      && <SingleStudentSF10 onNavigate={navigate} />}
-      {page === "sf10-bulk"         && <BulkSF10Generation onNavigate={navigate} />}
+      {page === "student-grade-view" && <StudentGradeView onNavigate={navigate} />}
+      {page === "general-average" && <GeneralAverageView onNavigate={navigate} />}
+      {page === "sf10-home" && <SF10Home onNavigate={navigate} />}
+      {page === "sf10-student" && <SingleStudentSF10 onNavigate={navigate} />}
+      {page === "sf10-bulk" && <BulkSF10Generation onNavigate={navigate} />}
     </div>
   );
 }

@@ -11,10 +11,13 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import Sidebar from "@/components/sidebar";
+
 import type { SchoolYear, Quarter } from "../types";
 import SchoolYearForm from "./SchoolYearForm";
 import { getSchoolYears, addSchoolYear, updateSchoolYear, deleteSchoolYear } from "@/services/api";
+import { useHeader } from "@/contexts/HeaderContext";
+import React from "react";
+import { ROUTES } from "@/routes";
 
 
 // ── Quarter Status Icon ────────────────────────────────────────────────────────
@@ -205,52 +208,42 @@ export default function SchoolYearList() {
     }
   }
 
+  useHeader({
+    title: "School Years",
+    subtitle: "Manage academic years and their quarterly periods",
+    breadcrumbs: [
+      { label: "School & Sections" },
+      { label: "School Years" },
+    ],
+    actions: (
+      <Button size="sm" className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
+        onClick={openNew}>
+        <Plus className="w-3.5 h-3.5" /> Add School Year
+      </Button>
+    )
+  });
+
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar
-        user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }}
-        onLogout={() => console.log("Logout")}
-      />
+    <>
+      <div className="p-6 max-w-2xl space-y-4">
 
-      <main className="flex-1 overflow-y-auto">
-        {/* Top Bar */}
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
-          <span className="text-xs text-slate-400">School & Sections</span>
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span className="text-xs font-semibold text-slate-600">School Years</span>
-          <div className="ml-auto">
-            <Button size="sm" className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
-              onClick={openNew}>
-              <Plus className="w-3.5 h-3.5" /> Add School Year
-            </Button>
-          </div>
-        </header>
+        {schoolYears.map((sy) => (
+          <SchoolYearCard
+            key={sy.id}
+            sy={sy}
+            onEdit={openEdit}
+            onDelete={handleDelete}
+            onEditQuarter={() => openEdit(sy)}
+          />
+        ))}
+      </div>
 
-        <div className="p-6 max-w-2xl space-y-4">
-          <div>
-            <h1 className="text-2xl font-black text-slate-800">School Years</h1>
-            <p className="text-sm text-slate-400 mt-0.5">Manage academic years and their quarterly periods.</p>
-          </div>
-
-          {schoolYears.map((sy) => (
-            <SchoolYearCard
-              key={sy.id}
-              sy={sy}
-              onEdit={openEdit}
-              onDelete={handleDelete}
-              onEditQuarter={() => openEdit(sy)}
-            />
-          ))}
-        </div>
-      </main>
-
-      {/* form dialog for add/edit */}
       <SchoolYearForm
         open={formOpen}
         initial={editingSY}
         onClose={() => setFormOpen(false)}
         onSave={handleSave}
       />
-    </div>
+    </>
   );
 }

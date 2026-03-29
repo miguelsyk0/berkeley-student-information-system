@@ -164,4 +164,19 @@ router.get("/students/:id/sf10", async (req, res) => {
   }
 });
 
-module.exports = router;
+// POST /api/students/:id/transcript
+router.post("/students/:id/transcript", async (req, res) => {
+  try {
+    const { records } = req.body;
+    const result = await db.one(
+      "SELECT save_student_transcript_history($1, $2) AS result",
+      [req.params.id, JSON.stringify(records)]
+    );
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "server error" });
+  }
+});
+
+module.exports = router;

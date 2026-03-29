@@ -15,13 +15,14 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useHeader } from "@/contexts/HeaderContext";
+import React from "react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import Sidebar from "@/components/sidebar";
 import { GRADE_COLORS, STATUS_STYLES } from "@/utils/gradeUtils";
 import { getAge, formatDate } from "@/utils/dateUtils";
 import { getStudents, getSections, getSchoolYears, deleteStudent as deleteStudentApi } from "@/services/api";
@@ -35,9 +36,8 @@ interface StudentWithEnrollment {
   firstName: string;
   middleName?: string;
   lastName: string;
-  nameExtension?: string;
-  sex: "Male" | "Female";
-  gender?: "Male" | "Female";
+  suffix?: string;
+  gender: "Male" | "Female";
   birthdate: string;
   // Enrollment fields returned by API
   enrollmentId?: number;
@@ -56,19 +56,19 @@ function getInitials(s: StudentWithEnrollment) {
 // Normalize rows from API (snake_case → camelCase)
 function normalizeStudent(raw: any): StudentWithEnrollment {
   return {
-    id:            raw.id,
-    lrn:           raw.lrn,
-    firstName:     raw.first_name  ?? raw.firstName  ?? "",
-    middleName:    raw.middle_name ?? raw.middleName  ?? "",
-    lastName:      raw.last_name   ?? raw.lastName   ?? "",
-    nameExtension: raw.name_extension ?? raw.nameExtension ?? "",
-    sex:           raw.gender      ?? raw.sex         ?? "Male",
-    birthdate:     raw.birthdate   ?? "",
-    enrollmentId:  raw.enrollment_id ?? raw.enrollmentId,
-    schoolYear:    raw.school_year ?? raw.schoolYear,
-    gradeLevel:    raw.grade_level ?? raw.gradeLevel,
-    sectionName:   raw.section_name ?? raw.sectionName ?? raw.section,
-    status:        raw.status,
+    id: raw.id,
+    lrn: raw.lrn,
+    firstName: raw.first_name ?? raw.firstName ?? "",
+    middleName: raw.middle_name ?? raw.middleName ?? "",
+    lastName: raw.last_name ?? raw.lastName ?? "",
+    suffix: raw.suffix ?? raw.name_extension ?? raw.nameExtension ?? "",
+    gender: raw.gender ?? raw.sex ?? "Male",
+    birthdate: raw.birthdate ?? "",
+    enrollmentId: raw.enrollment_id ?? raw.enrollmentId,
+    schoolYear: raw.school_year ?? raw.schoolYear,
+    gradeLevel: raw.grade_level ?? raw.gradeLevel,
+    sectionName: raw.section_name ?? raw.sectionName ?? raw.section,
+    status: raw.status,
   };
 }
 
@@ -102,7 +102,7 @@ function StudentRow({
             <div>
               <p className="text-sm font-semibold text-slate-800">
                 {student.lastName}, {student.firstName}
-                {student.nameExtension ? ` ${student.nameExtension}` : ""}
+                {student.suffix ? ` ${student.suffix}` : ""}
               </p>
               <p className="text-[11px] text-slate-400">{student.middleName}</p>
             </div>
@@ -114,9 +114,9 @@ function StudentRow({
           <span className="text-xs font-mono text-slate-600">{student.lrn}</span>
         </td>
 
-        {/* Sex / Age */}
+        {/* Gender / Age */}
         <td className="px-4 py-3.5">
-          <p className="text-xs text-slate-600">{student.sex}</p>
+          <p className="text-xs text-slate-600">{student.gender}</p>
           <p className="text-[11px] text-slate-400">
             {student.birthdate ? `${getAge(student.birthdate)} yrs · ${formatDate(student.birthdate)}` : "—"}
           </p>
@@ -204,45 +204,54 @@ function StudentRow({
 
 export default function StudentList() {
   const navigate = useNavigate();
-  const [students, setStudents]         = useState<StudentWithEnrollment[]>([]);
-  const [sections, setSections]         = useState<string[]>([]);
-  const [schoolYears, setSchoolYears]   = useState<{ id: number; label: string }[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [search, setSearch]             = useState("");
-  const [gradeFilter, setGradeFilter]   = useState("all");
-  const [sectionFilter, setSectionFilter] = useState("all");
-  const [yearFilter, setYearFilter]     = useState("2025-2026");
-  const [sexFilter, setSexFilter]       = useState("all");
+  const [filters, setFilters] = useState({
+    grade: "all",
+    section: "all",
+    year: "all",
+    gender: "all",
+    search: "",
+  });
 
-  // Load school years and sections for filter dropdowns
+  const [students, setStudents] = useState<StudentWithEnrollment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Load basic data
+  const [sections, setSections] = useState<any[]>([]);
+  const [years, setYears] = useState<any[]>([]);
+
   useEffect(() => {
-    async function loadMeta() {
+    async function loadResources() {
       try {
-        const years = await getSchoolYears();
-        setSchoolYears(years);
-        const activeYear = years.find(y => y.isActive) || years[0];
-        if (activeYear) setYearFilter(activeYear.label);
+        const [yearData] = await Promise.all([getSchoolYears()]);
+        setYears(yearData);
+        const activeYear = yearData.find(y => y.isActive) || yearData[0];
+        if (activeYear) {
+          setFilters(f => ({ ...f, year: activeYear.label }));
+        }
       } catch (err) {
-        console.error("Failed to load school years", err);
+        console.error("Failed to load summary filters", err);
       }
     }
-    loadMeta();
+    loadResources();
   }, []);
 
   // Reload sections when year or grade changes
   useEffect(() => {
     async function loadSections() {
       try {
-        const sy = schoolYears.find(y => y.label === yearFilter);
-        if (!sy) return;
-        const secs = await getSections(sy.id, gradeFilter !== "all" ? Number(gradeFilter) : undefined);
+        const sy = years.find(y => y.label === filters.year);
+        if (!sy) {
+          setSections([]);
+          return;
+        }
+        const secs = await getSections(sy.id, filters.grade !== "all" ? Number(filters.grade) : undefined);
         setSections(secs.map(s => s.name).sort());
       } catch (err) {
         console.error("Failed to load sections", err);
       }
     }
-    if (schoolYears.length > 0) loadSections();
-  }, [yearFilter, gradeFilter, schoolYears]);
+    if (years.length > 0) loadSections();
+  }, [filters.year, filters.grade, years]);
 
   // Fetch students whenever filters change
   useEffect(() => {
@@ -250,11 +259,11 @@ export default function StudentList() {
       try {
         setLoading(true);
         const data = await getStudents({
-          search:  search  || undefined,
-          grade:   gradeFilter   !== "all" ? gradeFilter   : undefined,
-          section: sectionFilter !== "all" ? sectionFilter : undefined,
-          year:    yearFilter    !== "all" ? yearFilter    : undefined,
-          sex:     sexFilter     !== "all" ? sexFilter     : undefined,
+          search: filters.search || undefined,
+          grade: filters.grade !== "all" ? filters.grade : undefined,
+          section: filters.section !== "all" ? filters.section : undefined,
+          year: filters.year !== "all" ? filters.year : undefined,
+          gender: filters.gender !== "all" ? filters.gender : undefined,
         });
         setStudents((data as any[]).map(normalizeStudent));
       } catch (error) {
@@ -264,7 +273,7 @@ export default function StudentList() {
       }
     }
     fetchStudents();
-  }, [search, gradeFilter, sectionFilter, yearFilter, sexFilter]);
+  }, [filters]);
 
   async function handleDelete(id: number) {
     try {
@@ -275,145 +284,140 @@ export default function StudentList() {
     }
   }
 
-  const enrolledCount   = students.filter(s => !!s.enrollmentId).length;
+  const enrolledCount = students.filter(s => !!s.enrollmentId).length;
   const unenrolledCount = students.length - enrolledCount;
 
+  useHeader({
+    breadcrumbs: [
+      { label: "Students" },
+      { label: "Student List" },
+    ],
+    actions: (
+      <Button
+        size="sm"
+        className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
+        onClick={() => navigate(ROUTES.students.enroll)}
+      >
+        <GraduationCap className="w-3.5 h-3.5" /> Enroll Student
+      </Button>
+    )
+  });
+
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar
-        user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }}
-        onLogout={() => console.log("Logout")}
-      />
-
-      <main className="flex-1 overflow-y-auto">
-        {/* Top Bar */}
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
-          <span className="text-xs text-slate-400">Students</span>
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span className="text-xs font-semibold text-slate-600">Student List</span>
-          <div className="ml-auto flex gap-2">
-            <Button
-              size="sm"
-              className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
-              onClick={() => navigate(ROUTES.students.enroll)}
-            >
-              <GraduationCap className="w-3.5 h-3.5" /> Enroll Student
-            </Button>
-          </div>
-        </header>
-
-        <div className="p-6 space-y-4">
-          {/* Title + summary */}
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-2xl font-black text-slate-800">Students</h1>
-              <p className="text-sm text-slate-400 mt-0.5">
-                {students.length} student{students.length !== 1 ? "s" : ""}
-                <span className="mx-1.5 text-slate-300">·</span>
-                <span className="text-emerald-600 font-medium">{enrolledCount} enrolled</span>
-                {unenrolledCount > 0 && (
-                  <><span className="mx-1.5 text-slate-300">·</span>
+    <div className="p-6 space-y-4">
+        {/* Title + summary */}
+        <div className="flex items-end justify-between">
+          <div>
+            <h1 className="text-2xl font-black text-slate-800">Students</h1>
+            <p className="text-sm text-slate-400 mt-0.5">
+              {students.length} student{students.length !== 1 ? "s" : ""}
+              <span className="mx-1.5 text-slate-300">·</span>
+              <span className="text-emerald-600 font-medium">{enrolledCount} enrolled</span>
+              {unenrolledCount > 0 && (
+                <><span className="mx-1.5 text-slate-300">·</span>
                   <span className="text-amber-600 font-medium">{unenrolledCount} not enrolled</span></>
-                )}
-              </p>
-            </div>
+              )}
+            </p>
           </div>
-
-          {/* Filters */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-48 max-w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <Input
-                placeholder="Search by name or LRN..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-8 text-xs bg-white border-slate-200"
-              />
-            </div>
-            <Select value={yearFilter} onValueChange={setYearFilter}>
-              <SelectTrigger className="h-8 w-32 text-xs border-slate-200 bg-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {schoolYears.map(y => (
-                  <SelectItem key={y.id} value={y.label}>{y.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={gradeFilter} onValueChange={(v) => { setGradeFilter(v); setSectionFilter("all"); }}>
-              <SelectTrigger className="h-8 w-32 text-xs border-slate-200 bg-white">
-                <SelectValue placeholder="All Grades" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Grades</SelectItem>
-                <SelectItem value="7">Grade 7</SelectItem>
-                <SelectItem value="8">Grade 8</SelectItem>
-                <SelectItem value="9">Grade 9</SelectItem>
-                <SelectItem value="10">Grade 10</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={sectionFilter} onValueChange={setSectionFilter}>
-              <SelectTrigger className="h-8 w-36 text-xs border-slate-200 bg-white">
-                <SelectValue placeholder="All Sections" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sections</SelectItem>
-                {sections.map(sec => (
-                  <SelectItem key={sec} value={sec}>{sec}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={sexFilter} onValueChange={setSexFilter}>
-              <SelectTrigger className="h-8 w-28 text-xs border-slate-200 bg-white">
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="Male">Male</SelectItem>
-                <SelectItem value="Female">Female</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Table */}
-          <Card className="border-0 shadow-sm overflow-hidden">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mb-3" />
-                <p className="text-sm font-semibold">Loading students...</p>
-              </div>
-            ) : students.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <Users className="w-10 h-10 mb-3 opacity-30" />
-                <p className="text-sm font-semibold">No students found</p>
-                <p className="text-xs mt-1">Try adjusting your filters or add a new student.</p>
-              </div>
-            ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/80">
-                    <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Student</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">LRN</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Sex / Age</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Enrollment</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map(student => (
-                    <StudentRow
-                      key={student.id}
-                      student={student}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Card>
         </div>
-      </main>
-    </div>
+
+        {/* Filters */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-48 max-w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <Input
+              placeholder="Search by name or LRN..."
+              value={filters.search}
+              onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
+              className="pl-9 h-8 text-xs bg-white border-slate-200"
+            />
+          </div>
+          <Select value={filters.year} onValueChange={(v) => setFilters(f => ({ ...f, year: v }))}>
+            <SelectTrigger className="h-8 w-32 text-xs border-slate-200 bg-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map(y => (
+                <SelectItem key={y.id} value={y.label}>{y.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filters.grade} onValueChange={(v) => { setFilters(f => ({ ...f, grade: v, section: "all" })); }}>
+            <SelectTrigger className="h-8 w-32 text-xs border-slate-200 bg-white">
+              <SelectValue placeholder="All Grades" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Grades</SelectItem>
+              <SelectItem value="7">Grade 7</SelectItem>
+              <SelectItem value="8">Grade 8</SelectItem>
+              <SelectItem value="9">Grade 9</SelectItem>
+              <SelectItem value="10">Grade 10</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filters.section} onValueChange={(v) => setFilters(f => ({ ...f, section: v }))}>
+            <SelectTrigger className="h-8 w-36 text-xs border-slate-200 bg-white">
+              <SelectValue placeholder="All Sections" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sections</SelectItem>
+              {sections.map(sec => (
+                <SelectItem key={sec} value={sec}>{sec}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {/* Gender Filter */}
+          <Select
+            value={filters.gender}
+            onValueChange={(v) => setFilters((f) => ({ ...f, gender: v }))}
+          >
+            <SelectTrigger className="h-8 w-28 text-xs border-slate-200 bg-white">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="Male">Male</SelectItem>
+              <SelectItem value="Female">Female</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Table */}
+        <Card className="border-0 shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+              <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mb-3" />
+              <p className="text-sm font-semibold">Loading students...</p>
+            </div>
+          ) : students.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+              <Users className="w-10 h-10 mb-3 opacity-30" />
+              <p className="text-sm font-semibold">No students found</p>
+              <p className="text-xs mt-1">Try adjusting your filters or add a new student.</p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/80">
+                  <th className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Student</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">LRN</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Sex / Age</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Enrollment</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {students.map(student => (
+                  <StudentRow
+                    key={student.id}
+                    student={student}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+      </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   UserCheck, ChevronRight, Search, UserX,
   CheckCircle2, AlertCircle, ArrowRight, Users,
+  Plus, Pencil, Trash2, Mail, GraduationCap, RotateCcw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,11 +14,16 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Sidebar from "@/components/sidebar";
 import type { Section, Teacher, SchoolYear } from "@/services/api";
-import { getSections, getTeachers, assignSectionAdviser, getSchoolYears } from "@/services/api";
-
+import { getSections, getTeachers, assignSectionAdviser, getSchoolYears, deleteTeacher, updateTeacher } from "@/services/api";
+import TeacherForm from "./TeacherForm";
 
 const GRADE_COLORS: Record<number, string> = {
   7:  "bg-teal-100 text-teal-800",
@@ -41,14 +47,16 @@ function AssignModal({
   onClose: () => void;
   onAssign: (sectionId: number, teacherId: number | null) => void;
 }) {
-  const [selectedId, setSelectedId] = useState<string>(
-    section?.adviserId ? String(section.adviserId) : ""
-  );
+  const [selectedId, setSelectedId] = useState<string>("unassigned");
+
+  useEffect(() => {
+    setSelectedId(section?.adviserId ? String(section.adviserId) : "unassigned");
+  }, [section, open]);
 
   if (!section) return null;
 
   function handleSave() {
-    onAssign(section!.id, selectedId ? Number(selectedId) : null);
+    onAssign(section!.id, selectedId === "unassigned" ? null : Number(selectedId));
     onClose();
   }
 
@@ -102,11 +110,11 @@ function AssignModal({
                 <SelectValue placeholder="Select a teacher..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Remove adviser</SelectItem>
-                {teachers.map((t) => (
+                <SelectItem value="unassigned">Remove adviser</SelectItem>
+                {teachers.filter(t => t.isActive).map((t) => (
                   <SelectItem key={t.id} value={String(t.id)}>
                     <div className="flex flex-col">
-                      <span>{t.name}</span>
+                      <span>{t.firstName} {t.lastName}</span>
                       <span className="text-[10px] text-slate-400">{t.employeeId}</span>
                     </div>
                   </SelectItem>
@@ -127,24 +135,118 @@ function AssignModal({
   );
 }
 
+// ── Teacher Details Modal ────────────────────────────────────────────────────────
+
+function TeacherDetailsModal({
+  teacher,
+  open,
+  onClose,
+}: {
+  teacher: Teacher | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  if (!teacher) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-base font-black text-slate-800 flex items-center gap-2">
+            <UserCheck className="w-4 h-4 text-teal-500" />
+            Teacher Profile Snapshot
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="py-2 space-y-5">
+          <div className="flex items-start gap-4">
+            <Avatar className="w-16 h-16 border-2 border-slate-100 rounded-2xl shadow-sm">
+              <AvatarFallback className="bg-slate-50 text-slate-500 rounded-2xl text-xl font-black">
+                {teacher.firstName?.[0]}{teacher.lastName?.[0]}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h2 className="text-lg font-black text-slate-900 leading-tight">
+                {teacher.firstName} {teacher.middleName} {teacher.lastName} {teacher.suffix}
+              </h2>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="outline" className="text-[10px] uppercase font-bold text-teal-600 border-teal-200 bg-teal-50 px-2 py-0">
+                  {teacher.employeeId}
+                </Badge>
+                {!teacher.isActive && (
+                  <Badge variant="secondary" className="text-[10px] uppercase font-bold text-slate-500 bg-slate-100 px-2 py-0">
+                    INACTIVE
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-y-4 gap-x-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Specialization</p>
+              <p className="text-xs font-semibold text-slate-800">{teacher.specialization || "None specified"}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Gender</p>
+              <p className="text-xs font-semibold text-slate-800">{teacher.gender || "Not specified"}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Contact Number</p>
+              <p className="text-xs font-semibold text-slate-800">{teacher.contactNumber || "N/A"}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Email Address</p>
+              <p className="text-xs font-semibold text-slate-800 break-all">{teacher.email || "N/A"}</p>
+            </div>
+          </div>
+          
+          {teacher.userId && (
+            <div className="bg-teal-50 border border-teal-100 rounded-lg p-3">
+              <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wider mb-0.5">Linked User Account ID</p>
+              <p className="text-xs font-mono font-medium text-teal-800 break-all">{teacher.userId}</p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function AdviserAssignment() {
   const [sections, setSections] = useState<Section[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
-  const [search, setSearch] = useState("");
-  const [yearFilter, setYearFilter] = useState("1"); // Use ID for filtering
+  
+  const [sectionSearch, setSectionSearch] = useState("");
+  const [teacherSearch, setTeacherSearch] = useState("");
+  const [yearFilter, setYearFilter] = useState("1");
+  
   const [selectedSection, setSelectedSection] = useState<Section | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [viewingTeacher, setViewingTeacher] = useState<Teacher | null>(null);
+
+  const fetchTeachers = async () => {
+    try {
+      const data = await getTeachers();
+      setTeachers(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
     getSchoolYears().then((sys) => {
       setSchoolYears(sys);
       if (sys.length > 0 && yearFilter === "1") setYearFilter(String(sys[0].id));
     }).catch(console.error);
-    getTeachers().then(setTeachers).catch(console.error);
-  }, []);
+    fetchTeachers();
+  }, [yearFilter]);
 
   useEffect(() => {
     if (yearFilter) {
@@ -154,12 +256,17 @@ export default function AdviserAssignment() {
 
   const unassigned = sections.filter((s) => !s.adviserId);
   const assigned   = sections.filter((s) =>  s.adviserId);
+  const activeTeachers = teachers.filter((t) => t.isActive);
 
   const filteredSections = sections.filter((s) => {
-    const matchSearch =
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      (s.adviserName ?? "").toLowerCase().includes(search.toLowerCase());
-    return matchSearch;
+    return s.name.toLowerCase().includes(sectionSearch.toLowerCase()) ||
+      (s.adviserName ?? "").toLowerCase().includes(sectionSearch.toLowerCase());
+  });
+
+  const filteredTeachers = teachers.filter(t => {
+    const fullName = `${t.firstName} ${t.lastName}`.toLowerCase();
+    const search = teacherSearch.toLowerCase();
+    return fullName.includes(search) || t.employeeId.toLowerCase().includes(search);
   });
 
   async function handleAssign(sectionId: number, teacherId: number | null) {
@@ -169,15 +276,28 @@ export default function AdviserAssignment() {
       setSections((prev) =>
         prev.map((s) =>
           s.id === sectionId
-            ? { ...s, adviserId: teacherId, adviserName: teacher?.name ?? null }
+            ? { ...s, adviserId: teacherId, adviserName: teacher ? `${teacher.firstName} ${teacher.lastName}` : null }
             : s
         )
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to assign adviser.");
+      const msg = err.message ? JSON.parse(err.message).error : "Failed to assign adviser.";
+      alert(msg);
     }
   }
+
+  const handleDeleteTeacher = async (id: number) => {
+    try {
+      await deleteTeacher(id);
+      fetchTeachers();
+      if (yearFilter) {
+        getSections(Number(yearFilter)).then(setSections).catch(console.error);
+      }
+    } catch (err) {
+      console.error("Failed to deactivate teacher:", err);
+    }
+  };
 
   function openModal(section: Section) {
     setSelectedSection(section);
@@ -196,17 +316,8 @@ export default function AdviserAssignment() {
         <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
           <span className="text-xs text-slate-400">School & Sections</span>
           <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span className="text-xs font-semibold text-slate-600">Adviser Assignment</span>
+          <span className="text-xs font-semibold text-slate-600">Advisers & Teachers</span>
           <div className="ml-auto flex gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <Input
-                placeholder="Search sections..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-8 w-48 text-xs bg-slate-50 border-slate-200"
-              />
-            </div>
             <Select value={yearFilter} onValueChange={setYearFilter}>
               <SelectTrigger className="h-8 w-32 text-xs border-slate-200">
                 <SelectValue />
@@ -220,14 +331,14 @@ export default function AdviserAssignment() {
           </div>
         </header>
 
-        <div className="p-6 space-y-6 max-w-4xl">
+        <div className="p-6 space-y-6 max-w-7xl mx-auto">
           <div>
-            <h1 className="text-2xl font-black text-slate-800">Adviser Assignment</h1>
-            <p className="text-sm text-slate-400 mt-0.5">Assign or reassign class advisers to sections.</p>
+            <h1 className="text-2xl font-black text-slate-800">Advisers & Teachers</h1>
+            <p className="text-sm text-slate-400 mt-0.5">Manage faculty members and assign class advisers.</p>
           </div>
 
-          {/* Summary cards */}
-          <div className="grid grid-cols-3 gap-3">
+          {/* Summary cards (Top Row) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Card className="border-0 shadow-sm">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
@@ -235,7 +346,7 @@ export default function AdviserAssignment() {
                 </div>
                 <div>
                   <p className="text-xl font-black text-slate-800">{assigned.length}</p>
-                  <p className="text-[11px] text-slate-400">Assigned</p>
+                  <p className="text-[11px] text-slate-400">Assigned Sections</p>
                 </div>
               </CardContent>
             </Card>
@@ -246,7 +357,7 @@ export default function AdviserAssignment() {
                 </div>
                 <div>
                   <p className="text-xl font-black text-slate-800">{unassigned.length}</p>
-                  <p className="text-[11px] text-slate-400">Unassigned</p>
+                  <p className="text-[11px] text-slate-400">Unassigned Sections</p>
                 </div>
               </CardContent>
             </Card>
@@ -257,83 +368,247 @@ export default function AdviserAssignment() {
                 </div>
                 <div>
                   <p className="text-xl font-black text-slate-800">{teachers.length}</p>
-                  <p className="text-[11px] text-slate-400">Teachers</p>
+                  <p className="text-[11px] text-slate-400">Total Teachers</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-xl font-black text-slate-800">{activeTeachers.length}</p>
+                  <p className="text-[11px] text-slate-400">Active Instructors</p>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Unassigned alert */}
-          {unassigned.length > 0 && (
-            <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-              <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-              <p className="text-xs text-amber-700 font-medium">
-                {unassigned.length} section{unassigned.length > 1 ? "s" : ""} still need an adviser assigned:{" "}
-                <span className="font-bold">{unassigned.map((s) => `Grade ${s.gradeLevel} – ${s.name}`).join(", ")}</span>
-              </p>
-            </div>
-          )}
+          {/* Split layout: Sections vs Teachers */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            
+            {/* LEFT COLUMN: Sections */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-black text-slate-800">Assign Advisers</h2>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <Input
+                    placeholder="Search sections..."
+                    value={sectionSearch}
+                    onChange={(e) => setSectionSearch(e.target.value)}
+                    className="pl-8 h-8 w-48 text-xs bg-white border-slate-200"
+                  />
+                </div>
+              </div>
 
-          {/* Section table */}
-          <Card className="border-0 shadow-sm overflow-hidden">
-            <CardHeader className="py-4 px-5 border-b border-slate-100">
-              <CardTitle className="text-sm font-black text-slate-700">
-                All Sections
-              </CardTitle>
-            </CardHeader>
-            <div className="divide-y divide-slate-100">
-              {filteredSections.map((section) => (
-                <div key={section.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 transition-colors group">
-                  {/* Grade + Name */}
-                  <div className="flex items-center gap-3 w-48 flex-shrink-0">
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${GRADE_COLORS[section.gradeLevel]}`}>
-                      G{section.gradeLevel}
-                    </span>
-                    <span className="text-sm font-semibold text-slate-700">{section.name}</span>
-                  </div>
-
-                  {/* Students */}
-                  <div className="flex items-center gap-1.5 text-xs text-slate-400 w-24 flex-shrink-0">
-                    <Users className="w-3.5 h-3.5" />
-                    {section.studentCount} students
-                  </div>
-
-                  {/* Adviser */}
-                  <div className="flex-1 flex items-center gap-2">
-                    {section.adviserName ? (
-                      <>
-                        <Avatar className="w-6 h-6">
-                          <AvatarFallback className="bg-teal-100 text-teal-800 text-[9px] font-bold">
-                            {section.adviserName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-xs font-semibold text-slate-700">{section.adviserName}</span>
-                        <Badge className="bg-emerald-100 text-emerald-700 border-0 text-[9px] h-4 px-1.5">Assigned</Badge>
-                      </>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-amber-600">
-                        <UserX className="w-4 h-4" />
-                        <span className="text-xs font-semibold">No adviser</span>
+              <Card className="border-0 shadow-sm overflow-hidden">
+                <div className="divide-y divide-slate-100 h-[600px] overflow-y-auto">
+                  {filteredSections.map((section) => (
+                    <div key={section.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group">
+                      <div className="flex items-center gap-2 w-32 flex-shrink-0">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${GRADE_COLORS[section.gradeLevel]}`}>
+                          G{section.gradeLevel}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-700 truncate">{section.name}</span>
                       </div>
-                    )}
-                  </div>
+                      <div className="flex-1 flex items-center gap-2 min-w-0">
+                        {section.adviserName ? (
+                          <>
+                            <Avatar className="w-5 h-5">
+                              <AvatarFallback className="bg-teal-100 text-teal-800 text-[8px] font-bold">
+                                {section.adviserName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-xs font-semibold text-slate-700 truncate">{section.adviserName}</span>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-amber-600">
+                            <span className="text-xs font-semibold">No adviser</span>
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={section.adviserName ? "outline" : "default"}
+                        className={`h-7 text-[10px] px-2.5 opacity-0 group-hover:opacity-100 transition-opacity ${
+                          !section.adviserName ? "bg-teal-600 hover:bg-teal-800 text-white" : ""
+                        }`}
+                        onClick={() => openModal(section)}
+                      >
+                        {section.adviserName ? "Reassign" : "Assign"}
+                      </Button>
+                    </div>
+                  ))}
+                  {filteredSections.length === 0 && (
+                     <div className="px-4 py-8 text-center text-slate-400 text-sm">No sections match your search.</div>
+                  )}
+                </div>
+              </Card>
+            </div>
 
-                  {/* Action */}
-                  <Button
+            {/* RIGHT COLUMN: Teachers */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-black text-slate-800">Teachers</h2>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                    <Input
+                      placeholder="Search teachers..."
+                      value={teacherSearch}
+                      onChange={(e) => setTeacherSearch(e.target.value)}
+                      className="pl-8 h-8 w-40 text-xs bg-white border-slate-200"
+                    />
+                  </div>
+                  <Button 
                     size="sm"
-                    variant={section.adviserName ? "outline" : "default"}
-                    className={`h-7 text-[11px] px-3 gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ${
-                      !section.adviserName ? "bg-teal-600 hover:bg-teal-800 text-white" : ""
-                    }`}
-                    onClick={() => openModal(section)}
+                    onClick={() => {
+                      setEditingTeacher(null);
+                      setIsFormOpen(true);
+                    }}
+                    className="bg-teal-600 hover:bg-teal-700 text-white h-8 text-xs gap-1"
                   >
-                    <UserCheck className="w-3 h-3" />
-                    {section.adviserName ? "Reassign" : "Assign"}
+                    <Plus className="w-3.5 h-3.5" /> Add
                   </Button>
                 </div>
-              ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 h-[600px] overflow-y-auto content-start">
+                {filteredTeachers.map((teacher) => (
+                  <Card 
+                    key={teacher.id} 
+                    className={`border-0 shadow-sm transition-all group overflow-hidden cursor-pointer hover:shadow-md ${!teacher.isActive ? "opacity-60 grayscale" : ""}`}
+                    onClick={() => setViewingTeacher(teacher)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex gap-3">
+                          <Avatar className="w-10 h-10 border border-slate-100 rounded-lg">
+                            <AvatarFallback className="bg-slate-50 text-slate-400 rounded-lg text-xs font-bold">
+                              {teacher.firstName?.[0]}{teacher.lastName?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-900 leading-tight">
+                              {teacher.firstName} {teacher.lastName}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-[10px] font-semibold text-teal-600 uppercase tracking-wider">
+                                {teacher.employeeId}
+                              </p>
+                              {!teacher.isActive && (
+                                <Badge variant="secondary" className="text-[8px] h-3.5 px-1 bg-slate-100 text-slate-500">INACTIVE</Badge>
+                              )}
+                            </div>
+                            <div className="flex flex-col gap-1 mt-2">
+                              {teacher.specialization && (
+                                <span className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                                  <GraduationCap className="w-3 h-3 text-slate-300" /> {teacher.specialization}
+                                </span>
+                              )}
+                              {teacher.email && (
+                                <span className="text-[11px] text-slate-500 flex items-center gap-1.5 truncate">
+                                  <Mail className="w-3 h-3 text-slate-300" /> {teacher.email}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                          <Button
+                            variant="ghost" size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTeacher(teacher);
+                              setIsFormOpen(true);
+                            }}
+                            className="h-7 w-7 rounded-md text-slate-400 hover:text-teal-600 hover:bg-teal-50"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          {teacher.isActive && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost" size="icon"
+                                  onClick={e => e.stopPropagation()}
+                                  className="h-7 w-7 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent onClick={e => e.stopPropagation()}>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Deactivate Teacher?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will mark <strong>{teacher.firstName} {teacher.lastName}</strong> as inactive. They will remain in past records but won't be available for new assignments.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleDeleteTeacher(teacher.id)}
+                                    className="bg-red-500 hover:bg-red-600"
+                                  >
+                                    Deactivate
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                          {!teacher.isActive && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost" size="icon"
+                                  onClick={e => e.stopPropagation()}
+                                  className="h-7 w-7 rounded-md text-slate-400 hover:text-teal-600 hover:bg-teal-50"
+                                >
+                                  <RotateCcw className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent onClick={e => e.stopPropagation()}>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Reactivate Teacher?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will mark <strong>{teacher.firstName} {teacher.lastName}</strong> as active again. They will be available for new section assignments.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={async () => {
+                                      try {
+                                        await updateTeacher(teacher.id, { ...teacher, isActive: true });
+                                        fetchTeachers();
+                                      } catch (err) {
+                                        console.error(err);
+                                      }
+                                    }}
+                                    className="bg-teal-500 hover:bg-teal-600 text-white"
+                                  >
+                                    Reactivate
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {filteredTeachers.length === 0 && (
+                   <div className="p-6 text-center text-slate-400 text-sm bg-white rounded-xl border border-dashed border-slate-200">
+                     No teachers found. Click "Add" to create one.
+                   </div>
+                )}
+              </div>
             </div>
-          </Card>
+
+          </div>
         </div>
       </main>
 
@@ -343,6 +618,22 @@ export default function AdviserAssignment() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onAssign={handleAssign}
+      />
+      
+      <TeacherForm
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onSuccess={() => {
+          setIsFormOpen(false);
+          fetchTeachers();
+        }}
+        teacher={editingTeacher}
+      />
+      
+      <TeacherDetailsModal
+        teacher={viewingTeacher}
+        open={viewingTeacher !== null}
+        onClose={() => setViewingTeacher(null)}
       />
     </div>
   );

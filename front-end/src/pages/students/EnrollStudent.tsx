@@ -15,12 +15,22 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { useHeader } from "@/contexts/HeaderContext";
+import React from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import Sidebar from "@/components/sidebar";
 import { GRADE_COLORS } from "@/utils/gradeUtils";
 import { getAge } from "@/utils/dateUtils";
-import { getStudents, addStudent, enrollStudent, getStudentEnrollments } from "@/services/api";
-import type { Student, Enrollment } from "@/services/api";
+import {
+  getStudents,
+  createStudent,
+  enrollStudent,
+  getStudentEnrollments,
+  getSections,
+  getSchoolYears,
+  addTransfereeTranscript,
+  getSchoolProfile
+} from "@/services/api";
+import type { Student, Enrollment, Section, SchoolYear } from "@/services/api";
 import { ROUTES } from "@/routes";
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -63,7 +73,7 @@ export interface GradeYearEntry {
   subjects: SubjectGradeEntry[];
 }
 
-type EnrollmentMode = "existing" | "transferee" | null;
+type EnrollmentMode = "existing" | "transferee" | "migration" | null;
 
 // transferee sub-pages
 // page 0 = dashboard (mode select)
@@ -76,40 +86,20 @@ type WizardPage = 0 | 1 | 2 | 3;
 // CONSTANTS / DEFAULTS
 // ══════════════════════════════════════════════════════════════════════════════
 
-const SECTIONS_BY_GRADE: Record<string, { id: number; name: string; adviserName: string; slots: number; enrolled: number }[]> = {
-  "7": [
-    { id: 1, name: "Integrity",  adviserName: "Ms. A. Reyes",  slots: 40, enrolled: 38 },
-    { id: 2, name: "Honesty",    adviserName: "Mr. B. Santos", slots: 40, enrolled: 36 },
-    { id: 3, name: "Loyalty",    adviserName: "TBA",           slots: 40, enrolled: 34 },
-  ],
-  "8": [
-    { id: 4, name: "Diligence",  adviserName: "Ms. C. Cruz",   slots: 40, enrolled: 40 },
-    { id: 5, name: "Humility",   adviserName: "Mr. D. Lim",    slots: 40, enrolled: 38 },
-  ],
-  "9": [
-    { id: 6, name: "Wisdom",     adviserName: "Ms. E. Garcia", slots: 40, enrolled: 35 },
-    { id: 7, name: "Courage",    adviserName: "TBA",           slots: 40, enrolled: 32 },
-  ],
-  "10": [
-    { id: 8, name: "Excellence", adviserName: "Mr. F. Torres", slots: 40, enrolled: 37 },
-  ],
-};
-
-const SCHOOL_YEARS = ["2025-2026", "2024-2025", "2023-2024", "2022-2023", "2021-2022", "2020-2021"];
 
 const DEFAULT_SUBJECTS: SubjectGradeEntry[] = [
-  { subjectName: "Filipino",                             q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
-  { subjectName: "English",                              q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
-  { subjectName: "Mathematics",                          q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
-  { subjectName: "Science",                              q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
-  { subjectName: "Araling Panlipunan (AP)",              q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
-  { subjectName: "Edukasyon sa Pagpapakatao (EsP)",       q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
+  { subjectName: "Filipino", q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
+  { subjectName: "English", q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
+  { subjectName: "Mathematics", q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
+  { subjectName: "Science", q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
+  { subjectName: "Araling Panlipunan (AP)", q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
+  { subjectName: "Edukasyon sa Pagpapakatao (EsP)", q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
   { subjectName: "Technology and Livelihood Education (TLE)", q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
-  { subjectName: "MAPEH", isMapeh: true,                 q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
-  { subjectName: "Music",   isMapeh: true, mapehComponent: "Music",  q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
-  { subjectName: "Arts",    isMapeh: true, mapehComponent: "Arts",   q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
+  { subjectName: "MAPEH", isMapeh: true, q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
+  { subjectName: "Music", isMapeh: true, mapehComponent: "Music", q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
+  { subjectName: "Arts", isMapeh: true, mapehComponent: "Arts", q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
   { subjectName: "Physical Education", isMapeh: true, mapehComponent: "PE", q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
-  { subjectName: "Health",  isMapeh: true, mapehComponent: "Health", q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
+  { subjectName: "Health", isMapeh: true, mapehComponent: "Health", q1: "", q2: "", q3: "", q4: "", finalRating: "", remarks: "" },
 ];
 
 const EMPTY_GRADE_YEAR_ENTRY = (): GradeYearEntry => ({
@@ -193,24 +183,24 @@ function Field({
 }
 
 function SectionSelector({
-  gradeLevel, selectedSectionId, onSelect, accent = "teal",
+  gradeLevel, selectedSectionId, onSelect, accent = "teal", sections = [],
 }: {
   gradeLevel: string;
   selectedSectionId: number | null;
   onSelect: (id: number, name: string) => void;
-  accent?: "teal" | "violet";
+  accent?: "teal" | "violet" | "indigo";
+  sections: Section[];
 }) {
-  const sections = SECTIONS_BY_GRADE[gradeLevel] ?? [];
-  const selBorder = accent === "violet" ? "border-violet-400 bg-violet-50" : "border-teal-400 bg-teal-50";
-  const hov       = accent === "violet" ? "hover:border-violet-200 hover:bg-violet-50/40" : "hover:border-teal-200 hover:bg-teal-50/40";
-  const chk       = accent === "violet" ? "text-violet-600" : "text-teal-600";
+  const selBorder = accent === "indigo" ? "border-indigo-400 bg-indigo-50" : accent === "violet" ? "border-violet-400 bg-violet-50" : "border-teal-400 bg-teal-50";
+  const hov = accent === "indigo" ? "hover:border-indigo-200 hover:bg-indigo-50/40" : accent === "violet" ? "hover:border-violet-200 hover:bg-violet-50/40" : "hover:border-teal-200 hover:bg-teal-50/40";
+  const chk = accent === "indigo" ? "text-indigo-600" : accent === "violet" ? "text-violet-600" : "text-teal-600";
 
   return (
     <div className="space-y-2">
       {sections.map((sec) => {
-        const full   = sec.enrolled >= sec.slots;
-        const sel    = selectedSectionId === sec.id;
-        const remain = sec.slots - sec.enrolled;
+        const full = (sec.enrolledCount ?? 0) >= (sec.capacity ?? 40);
+        const sel = selectedSectionId === sec.id;
+        const remain = (sec.capacity ?? 40) - (sec.enrolledCount ?? 0);
         return (
           <button
             key={sec.id}
@@ -229,7 +219,7 @@ function SectionSelector({
               <p className="text-[11px] text-slate-400">{sec.adviserName}</p>
             </div>
             <div className="text-right">
-              <p className="text-xs font-semibold text-slate-600">{sec.enrolled} / {sec.slots}</p>
+              <p className="text-xs font-semibold text-slate-600">{sec.enrolledCount ?? 0} / {sec.capacity ?? 40}</p>
               <p className={`text-[10px] ${full ? "text-red-500 font-bold" : "text-slate-400"}`}>
                 {full ? "Full" : `${remain} slot${remain !== 1 ? "s" : ""} left`}
               </p>
@@ -249,9 +239,9 @@ function SectionSelector({
 function ModeSelectorPage({
   onSelect,
 }: {
-  onSelect: (mode: "existing" | "transferee") => void;
+  onSelect: (mode: EnrollmentMode) => void;
 }) {
-  const [hovered, setHovered] = useState<"existing" | "transferee" | null>(null);
+  const [hovered, setHovered] = useState<EnrollmentMode>(null);
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center min-h-full py-16 px-6">
@@ -326,7 +316,7 @@ function ModeSelectorPage({
                 Transferee
               </p>
               <p className="text-[12px] text-slate-400 leading-relaxed">
-                New student from another school. Creates a full profile, encodes prior transcript for SF10.
+                New student from another school. Creates a full profile and encodes prior transcript for SF10.
               </p>
             </div>
             <div className={`flex items-center gap-1.5 text-xs font-bold transition-colors duration-200
@@ -334,14 +324,35 @@ function ModeSelectorPage({
             >
               Full Enrollment <ArrowRight className="w-3.5 h-3.5" />
             </div>
-            {/* Steps preview */}
-            <div className="absolute bottom-4 right-5 flex gap-1">
-              {["Profile", "Transcript", "Grade", "Section"].map((s, i) => (
-                <span key={i} className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-colors
-                  ${hovered === "transferee" ? "bg-violet-100 text-violet-600" : "bg-slate-100 text-slate-400"}`}>
-                  {s}
-                </span>
-              ))}
+          </button>
+
+          {/* Migration */}
+          <button
+            onClick={() => onSelect("migration")}
+            onMouseEnter={() => setHovered("migration" as any)}
+            onMouseLeave={() => setHovered(null)}
+            className={`group relative flex flex-col items-start gap-4 p-7 rounded-2xl border-2 text-left transition-all duration-200
+              ${hovered === "migration"
+                ? "border-indigo-400 bg-indigo-50 shadow-lg shadow-indigo-100 -translate-y-0.5"
+                : "border-slate-150 bg-white hover:shadow-md"}`}
+          >
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors duration-200
+              ${hovered === "migration" ? "bg-indigo-600" : "bg-slate-100"}`}
+            >
+              <ClipboardList className={`w-6 h-6 transition-colors duration-200 ${hovered === "migration" ? "text-white" : "text-slate-500"}`} />
+            </div>
+            <div className="flex-1 space-y-1">
+              <p className={`text-base font-black transition-colors ${hovered === "migration" ? "text-indigo-800" : "text-slate-800"}`}>
+                Migration
+              </p>
+              <p className="text-[12px] text-slate-400 leading-relaxed">
+                Existing student with paper records. Migrates history to digital format using school profile.
+              </p>
+            </div>
+            <div className={`flex items-center gap-1.5 text-xs font-bold transition-colors duration-200
+              ${hovered === "migration" ? "text-indigo-600" : "text-slate-400"}`}
+            >
+              Digitize Records <ArrowRight className="w-3.5 h-3.5" />
             </div>
           </button>
         </div>
@@ -358,20 +369,31 @@ function TransfereeInfoPage({
   form,
   onChange,
   errors,
+  mode,
 }: {
   form: TransfereeForm;
   onChange: <K extends keyof TransfereeForm>(key: K, value: TransfereeForm[K]) => void;
   errors: Partial<Record<keyof TransfereeForm, string>>;
+  mode: EnrollmentMode;
 }) {
   const hasCredential = !!form.otherCredential && form.otherCredential !== "none";
 
   return (
     <div className="max-w-3xl mx-auto space-y-5 py-6 px-6">
       {/* Notice */}
-      <div className="flex gap-3 bg-violet-50 border border-violet-100 rounded-xl px-4 py-3">
-        <UserPlus className="w-4 h-4 text-violet-500 flex-shrink-0 mt-0.5" />
-        <p className="text-[11px] text-violet-700 leading-relaxed">
-          Fill in the student's personal information, elementary school eligibility details, and any alternative credentials. You'll enter prior school transcript records on the next step.
+      <div className={`flex gap-3 border rounded-xl px-4 py-3 ${mode === "migration" ? "bg-indigo-50 border-indigo-100" : "bg-violet-50 border-violet-100"
+        }`}>
+        {mode === "migration" ? (
+          <ClipboardList className="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" />
+        ) : (
+          <UserPlus className="w-4 h-4 text-violet-500 flex-shrink-0 mt-0.5" />
+        )}
+        <p className={`text-[11px] leading-relaxed ${mode === "migration" ? "text-indigo-700" : "text-violet-700"
+          }`}>
+          {mode === "migration"
+            ? "Digitizing records for an existing student. Personal information and elementary details are required. Prior school records will be pre-filled with the school's profile."
+            : "Fill in the student's personal information, elementary school eligibility details, and any alternative credentials. You'll enter prior school transcript records on the next step."
+          }
         </p>
       </div>
 
@@ -565,11 +587,11 @@ function GradeEncodingTable({
         <tbody>
           {entry.subjects.map((subj, idx) => {
             const isMapehParent = subj.isMapeh && !subj.mapehComponent;
-            const isMapehChild  = subj.isMapeh && !!subj.mapehComponent;
+            const isMapehChild = subj.isMapeh && !!subj.mapehComponent;
             const computedFinal = computeFinalRating(subj);
             const finalVal = subj.finalRating || computedFinal;
             const finalNum = parseFloat(finalVal);
-            const passed   = !isNaN(finalNum) && finalNum >= 75;
+            const passed = !isNaN(finalNum) && finalNum >= 75;
 
             return (
               <tr
@@ -601,18 +623,16 @@ function GradeEncodingTable({
                   {isMapehParent ? (
                     <span className="text-[11px] text-slate-400 italic">—</span>
                   ) : (
-                    <span className={`text-[11px] font-bold ${
-                      !finalVal ? "text-slate-300" : passed ? "text-emerald-600" : "text-red-500"
-                    }`}>
+                    <span className={`text-[11px] font-bold ${!finalVal ? "text-slate-300" : passed ? "text-emerald-600" : "text-red-500"
+                      }`}>
                       {finalVal || "—"}
                     </span>
                   )}
                 </td>
                 <td className="px-1 py-1 text-center">
                   {!isMapehParent && finalVal && (
-                    <Badge className={`text-[9px] h-4 px-1.5 border-0 ${
-                      passed ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
-                    }`}>
+                    <Badge className={`text-[9px] h-4 px-1.5 border-0 ${passed ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
+                      }`}>
                       {passed ? "P" : "F"}
                     </Badge>
                   )}
@@ -626,9 +646,8 @@ function GradeEncodingTable({
               General Average
             </td>
             <td className="px-2 py-2 text-center">
-              <span className={`text-sm font-black ${
-                entry.generalAverage ? "text-slate-800" : "text-slate-300"
-              }`}>
+              <span className={`text-sm font-black ${entry.generalAverage ? "text-slate-800" : "text-slate-300"
+                }`}>
                 {entry.generalAverage || "—"}
               </span>
             </td>
@@ -652,6 +671,7 @@ function GradeYearEntryPanel({
   onUpdate,
   onRemove,
   onUpdateSubject,
+  allYears,
 }: {
   entry: GradeYearEntry;
   entryIndex: number;
@@ -660,6 +680,7 @@ function GradeYearEntryPanel({
   onUpdate: (schoolId: string, entryId: string, field: keyof GradeYearEntry, value: string) => void;
   onRemove: (schoolId: string, entryId: string) => void;
   onUpdateSubject: (schoolId: string, entryId: string, subjectIdx: number, field: keyof SubjectGradeEntry, value: string) => void;
+  allYears: SchoolYear[];
 }) {
   const [open, setOpen] = useState(true);
   const label = entry.gradeLevel ? `Grade ${entry.gradeLevel}` : `Entry ${entryIndex + 1}`;
@@ -708,7 +729,7 @@ function GradeYearEntryPanel({
                   <SelectValue placeholder="Select..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {["7","8","9","10"].map((g) => (
+                  {["7", "8", "9", "10"].map((g) => (
                     <SelectItem key={g} value={g}>Grade {g}</SelectItem>
                   ))}
                 </SelectContent>
@@ -720,8 +741,8 @@ function GradeYearEntryPanel({
                   <SelectValue placeholder="Select..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {SCHOOL_YEARS.map((y) => (
-                    <SelectItem key={y} value={y}>{y}</SelectItem>
+                  {allYears.map((y) => (
+                    <SelectItem key={y.id} value={y.label}>{y.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -781,6 +802,7 @@ function SchoolRecordCard({
   onRemoveEntry,
   onAddEntry,
   onUpdateSubject,
+  allYears,
 }: {
   record: SchoolRecord;
   recordIndex: number;
@@ -791,6 +813,7 @@ function SchoolRecordCard({
   onRemoveEntry: (schoolId: string, entryId: string) => void;
   onAddEntry: (schoolId: string) => void;
   onUpdateSubject: (schoolId: string, entryId: string, subjectIdx: number, field: keyof SubjectGradeEntry, value: string) => void;
+  allYears: SchoolYear[];
 }) {
   const hasName = !!record.schoolName.trim();
 
@@ -882,11 +905,10 @@ function SchoolRecordCard({
                   {e.generalAverage && (
                     <span className="text-[10px] text-emerald-600 font-bold">GWA {e.generalAverage}</span>
                   )}
-                  <Badge className={`ml-auto text-[9px] h-4 px-1.5 border-0 ${
-                    e.remarks === "Promoted" ? "bg-emerald-50 text-emerald-700"
-                    : e.remarks === "Retained" ? "bg-amber-50 text-amber-700"
-                    : "bg-slate-100 text-slate-500"
-                  }`}>{e.remarks}</Badge>
+                  <Badge className={`ml-auto text-[9px] h-4 px-1.5 border-0 ${e.remarks === "Promoted" ? "bg-emerald-50 text-emerald-700"
+                      : e.remarks === "Retained" ? "bg-amber-50 text-amber-700"
+                        : "bg-slate-100 text-slate-500"
+                    }`}>{e.remarks}</Badge>
                 </div>
               ))}
             </div>
@@ -918,6 +940,7 @@ function SchoolRecordCard({
                 onUpdate={onUpdateEntry}
                 onRemove={onRemoveEntry}
                 onUpdateSubject={onUpdateSubject}
+                allYears={allYears}
               />
             ))}
           </div>
@@ -945,6 +968,7 @@ function TranscriptPage({
   onRemoveEntry,
   onAddEntry,
   onUpdateSubject,
+  allYears,
 }: {
   records: SchoolRecord[];
   onUpdateSchool: (id: string, field: keyof SchoolRecord, value: string) => void;
@@ -954,6 +978,7 @@ function TranscriptPage({
   onRemoveEntry: (schoolId: string, entryId: string) => void;
   onAddEntry: (schoolId: string) => void;
   onUpdateSubject: (schoolId: string, entryId: string, subjectIdx: number, field: keyof SubjectGradeEntry, value: string) => void;
+  allYears: SchoolYear[];
 }) {
   return (
     <div className="space-y-5 py-6 px-6">
@@ -983,6 +1008,7 @@ function TranscriptPage({
           onRemoveEntry={onRemoveEntry}
           onAddEntry={onAddEntry}
           onUpdateSubject={onUpdateSubject}
+          allYears={allYears}
         />
       ))}
 
@@ -1016,8 +1042,10 @@ function EnrollmentAssignmentPage({
   onSelectSection,
   existingEnrollment,
   errors,
+  allYears,
+  allSections,
 }: {
-  mode: "existing" | "transferee";
+  mode: EnrollmentMode;
   selectedStudent: Student | null;
   onSelectStudent: (s: Student) => void;
   transfereeName: string;
@@ -1030,6 +1058,8 @@ function EnrollmentAssignmentPage({
   onSelectSection: (id: number, name: string) => void;
   existingEnrollment: unknown;
   errors: Record<string, string>;
+  allYears: SchoolYear[];
+  allSections: Section[];
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Student[]>([]);
@@ -1041,15 +1071,15 @@ function EnrollmentAssignmentPage({
     }
     const timer = setTimeout(async () => {
       try {
-         const data = await getStudents({ search: query });
-         setResults(data.slice(0, 5));
+        const data = await getStudents({ search: query });
+        setResults(data.slice(0, 5));
       } catch (err) { console.error(err); }
     }, 300);
     return () => clearTimeout(timer);
   }, [query]);
 
-  const accent   = mode === "transferee" ? "violet" : "teal";
-  const stepColor = mode === "transferee" ? "bg-violet-600" : "bg-teal-600";
+  const accent = mode === "migration" ? "indigo" : mode === "transferee" ? "violet" : "teal";
+  const stepColor = mode === "migration" ? "bg-indigo-600" : mode === "transferee" ? "bg-violet-600" : "bg-teal-600";
 
   function StepNum({ n }: { n: number }) {
     return (
@@ -1082,7 +1112,7 @@ function EnrollmentAssignmentPage({
                     </p>
                     <p className="text-[11px] text-slate-500 font-mono">{selectedStudent.lrn}</p>
                     <p className="text-[11px] text-slate-400">
-                      {selectedStudent.sex} · {getAge(selectedStudent.birthdate)} yrs
+                      {selectedStudent.gender} · {getAge(selectedStudent.birthdate)} yrs
                     </p>
                   </div>
                   <button
@@ -1138,19 +1168,28 @@ function EnrollmentAssignmentPage({
         </div>
       )}
 
-      {/* Transferee confirmation chip */}
-      {mode === "transferee" && transfereeName && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-violet-50 border border-violet-100 rounded-xl">
+      {/* Transferee / Migration confirmation chip */}
+      {(mode === "transferee" || mode === "migration") && transfereeName && (
+        <div className={`flex items-center gap-3 px-4 py-3 border rounded-xl ${mode === "migration" ? "bg-indigo-50 border-indigo-100" : "bg-violet-50 border-violet-100"
+          }`}>
           <Avatar className="w-9 h-9">
-            <AvatarFallback className="bg-violet-200 text-violet-800 font-black text-sm">
+            <AvatarFallback className={`font-black text-sm ${mode === "migration" ? "bg-indigo-200 text-indigo-800" : "bg-violet-200 text-violet-800"
+              }`}>
               {transfereeName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
             </AvatarFallback>
           </Avatar>
           <div>
-            <p className="text-sm font-black text-violet-800">{transfereeName}</p>
-            <p className="text-[11px] text-violet-500">New transferee profile</p>
+            <p className={`text-sm font-black ${mode === "migration" ? "text-indigo-800" : "text-violet-800"
+              }`}>{transfereeName}</p>
+            <p className={`text-[11px] ${mode === "migration" ? "text-indigo-500" : "text-violet-500"
+              }`}>
+              {mode === "migration" ? "Existing student migration" : "New transferee profile"}
+            </p>
           </div>
-          <Badge className="ml-auto bg-violet-100 text-violet-700 border-0 text-[10px]">Transferee</Badge>
+          <Badge className={`ml-auto border-0 text-[10px] ${mode === "migration" ? "bg-indigo-100 text-indigo-700" : "bg-violet-100 text-violet-700"
+            }`}>
+            {mode === "migration" ? "Migration" : "Transferee"}
+          </Badge>
         </div>
       )}
 
@@ -1169,7 +1208,9 @@ function EnrollmentAssignmentPage({
               <Select value={schoolYear} onValueChange={onSchoolYear}>
                 <SelectTrigger className="h-9 text-sm border-slate-200"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {SCHOOL_YEARS.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                  {(allYears as SchoolYear[]).map((y: SchoolYear) => (
+                    <SelectItem key={y.id} value={y.label}>{y.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {errors.schoolYear && <p className="text-[11px] text-red-500 mt-1">{errors.schoolYear}</p>}
@@ -1183,7 +1224,7 @@ function EnrollmentAssignmentPage({
                   <SelectValue placeholder="Select grade..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {["7","8","9","10"].map((g) => (
+                  {["7", "8", "9", "10"].map((g) => (
                     <SelectItem key={g} value={g}>Grade {g}</SelectItem>
                   ))}
                 </SelectContent>
@@ -1206,6 +1247,10 @@ function EnrollmentAssignmentPage({
             selectedSectionId={selectedSectionId}
             onSelect={onSelectSection}
             accent={accent}
+            sections={allSections.filter(s => {
+              const syId = (allYears as SchoolYear[]).find((y: SchoolYear) => y.label === schoolYear)?.id;
+              return s.gradeLevel === Number(gradeLevel) && s.schoolYearId === syId;
+            })}
           />
           {errors.section && <p className="text-[11px] text-red-500">{errors.section}</p>}
         </div>
@@ -1215,23 +1260,29 @@ function EnrollmentAssignmentPage({
       {gradeLevel && selectedSectionId && (
         mode === "existing" ? selectedStudent : transfereeName
       ) && (
-        <Card className={`border-0 shadow-sm ${mode === "transferee" ? "bg-violet-50" : "bg-teal-50"}`}>
-          <CardContent className="px-5 py-4 flex items-center gap-3">
-            <CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${mode === "transferee" ? "text-violet-600" : "text-teal-600"}`} />
-            <p className={`text-sm ${mode === "transferee" ? "text-violet-800" : "text-teal-800"}`}>
-              <span className="font-black">
-                {mode === "existing"
-                  ? `${selectedStudent?.firstName} ${selectedStudent?.lastName}`
-                  : transfereeName}
-              </span>
-              {" will be enrolled in "}
-              <span className="font-black">Grade {gradeLevel} — {selectedSectionName}</span>
-              {" for S.Y. "}
-              <span className="font-black">{schoolYear}</span>.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+          <Card className={`border-0 shadow-sm ${mode === "migration" ? "bg-indigo-50" :
+              mode === "transferee" ? "bg-violet-50" : "bg-teal-50"
+            }`}>
+            <CardContent className="px-5 py-4 flex items-center gap-3">
+              <CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${mode === "migration" ? "text-indigo-600" :
+                  mode === "transferee" ? "text-violet-600" : "text-teal-600"
+                }`} />
+              <p className={`text-sm ${mode === "migration" ? "text-indigo-800" :
+                  mode === "transferee" ? "text-violet-800" : "text-teal-800"
+                }`}>
+                <span className="font-black">
+                  {mode === "existing"
+                    ? `${selectedStudent?.firstName} ${selectedStudent?.lastName}`
+                    : transfereeName}
+                </span>
+                {" will be enrolled in "}
+                <span className="font-black">Grade {gradeLevel} — {selectedSectionName}</span>
+                {" for S.Y. "}
+                <span className="font-black">{schoolYear}</span>.
+              </p>
+            </CardContent>
+          </Card>
+        )}
     </div>
   );
 }
@@ -1253,25 +1304,25 @@ function WizardProgressBar({
     mode === "existing"
       ? [{ label: "Type", page: 0 }, { label: "Enrollment", page: 3 }]
       : [
-          { label: "Type",       page: 0 },
-          { label: "Profile",    page: 1 },
-          { label: "Transcript", page: 2 },
-          { label: "Enrollment", page: 3 },
-        ];
+        { label: "Type", page: 0 },
+        { label: "Profile", page: 1 },
+        { label: "Transcript", page: 2 },
+        { label: "Enrollment", page: 3 },
+      ];
 
   const currentIdx = steps.findIndex((s) => s.page === page);
 
   return (
     <div className="flex items-center gap-0 ml-4">
       {steps.map((step, idx) => {
-        const done    = idx < currentIdx;
+        const done = idx < currentIdx;
         const current = idx === currentIdx;
         return (
           <div key={step.label} className="flex items-center">
             <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold transition-all
-              ${done    ? (mode === "transferee" ? "bg-violet-100 text-violet-600" : "bg-teal-100 text-teal-600")
-              : current ? (mode === "transferee" ? "bg-violet-600 text-white" : "bg-teal-600 text-white")
-              :           "bg-slate-100 text-slate-400"}`}
+              ${done ? (mode === "transferee" ? "bg-violet-100 text-violet-600" : "bg-teal-100 text-teal-600")
+                : current ? (mode === "transferee" ? "bg-violet-600 text-white" : "bg-teal-600 text-white")
+                  : "bg-slate-100 text-slate-400"}`}
             >
               {done && <CheckCircle2 className="w-3 h-3" />}
               {step.label}
@@ -1291,32 +1342,57 @@ function WizardProgressBar({
 // ══════════════════════════════════════════════════════════════════════════════
 
 export default function EnrollStudent() {
-  const navigate  = useNavigate();
+  const navigate = useNavigate();
   const { state } = useLocation();
   const prefilledStudent: Student | null = state?.student ?? null;
 
   // ── Wizard state ──
-  const [mode, setMode]   = useState<EnrollmentMode>(prefilledStudent ? "existing" : null);
-  const [page, setPage]   = useState<WizardPage>(prefilledStudent ? 3 : 0);
+  const [mode, setMode] = useState<EnrollmentMode>(prefilledStudent ? "existing" : null);
+  const [page, setPage] = useState<WizardPage>(prefilledStudent ? 3 : 0);
 
   // ── Shared enrollment fields ──
-  const [schoolYear, setSchoolYear]             = useState("2025-2026");
-  const [gradeLevel, setGradeLevel]             = useState("");
-  const [selectedSectionId, setSelectedSectionId]     = useState<number | null>(null);
+  const [schoolYear, setSchoolYear] = useState("2025-2026");
+  const [gradeLevel, setGradeLevel] = useState("");
+  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
   const [selectedSectionName, setSelectedSectionName] = useState("");
-  const [errors, setErrors]                     = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // ── Existing student ──
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(prefilledStudent);
 
   // ── Transferee ──
-  const [transfereeForm, setTransfereeForm]           = useState<TransfereeForm>(EMPTY_TRANSFEREE_FORM());
+  const [transfereeForm, setTransfereeForm] = useState<TransfereeForm>(EMPTY_TRANSFEREE_FORM());
   const [transfereeFormErrors, setTransfereeFormErrors] = useState<Partial<Record<keyof TransfereeForm, string>>>({});
-  const [schoolRecords, setSchoolRecords]             = useState<SchoolRecord[]>([EMPTY_SCHOOL_RECORD()]);
+  const [schoolRecords, setSchoolRecords] = useState<SchoolRecord[]>([EMPTY_SCHOOL_RECORD()]);
+
+  // ── Resource state ──
+  const [allSections, setAllSections] = useState<Section[]>([]);
+  const [allYears, setAllYears] = useState<SchoolYear[]>([]);
+  const [schoolProfile, setSchoolProfile] = useState<any>(null);
+
+  useEffect(() => {
+    async function loadMeta() {
+      try {
+        const [secs, years, profile] = await Promise.all([
+          getSections(),
+          getSchoolYears(),
+          getSchoolProfile().catch(() => null)
+        ]);
+        setAllSections(secs);
+        setAllYears(years);
+        setSchoolProfile(profile);
+        const activeYear = years.find(y => y.isActive) || years[0];
+        if (activeYear) setSchoolYear(activeYear.label);
+      } catch (err) {
+        console.error("Failed to load enrollment resources", err);
+      }
+    }
+    loadMeta();
+  }, []);
 
   // ── Derived ──
   const [existingEnrollment, setExistingEnrollment] = useState<Enrollment | null>(null);
-  
+
   useEffect(() => {
     if (mode === "existing" && selectedStudent) {
       getStudentEnrollments(selectedStudent.id)
@@ -1331,33 +1407,57 @@ export default function EnrollStudent() {
   }, [selectedStudent, schoolYear, mode]);
 
   const transfereeName = [transfereeForm.firstName, transfereeForm.lastName].filter(Boolean).join(" ");
-  const accentColor    = mode === "transferee" ? "violet" : "teal";
+  const accentColor = mode === "migration" ? "indigo" : mode === "transferee" ? "violet" : "teal";
 
   // ── Mode select ──
-  function handleModeSelect(m: "existing" | "transferee") {
+  function handleModeSelect(m: EnrollmentMode) {
+    if (!m) return;
     setMode(m);
     setErrors({});
     setGradeLevel("");
     setSelectedSectionId(null);
     setSelectedSectionName("");
+
     if (m === "existing") {
       setTransfereeForm(EMPTY_TRANSFEREE_FORM());
       setSchoolRecords([EMPTY_SCHOOL_RECORD()]);
-    } else {
       setSelectedStudent(null);
+      setPage(3);
+    } else if (m === "migration") {
+      setSelectedStudent(null);
+      setTransfereeForm(EMPTY_TRANSFEREE_FORM());
+      // Pre-fill school record with our own profile
+      if (schoolProfile) {
+        setSchoolRecords([{
+          ...EMPTY_SCHOOL_RECORD(),
+          schoolName: schoolProfile.name || "",
+          schoolId: schoolProfile.schoolId || "",
+          schoolAddress: schoolProfile.address || "",
+          district: schoolProfile.district || "",
+          division: schoolProfile.division || "",
+          region: schoolProfile.region || "",
+        }]);
+      } else {
+        setSchoolRecords([EMPTY_SCHOOL_RECORD()]);
+      }
+      setPage(1);
+    } else {
+      // transferee
+      setSelectedStudent(null);
+      setTransfereeForm(EMPTY_TRANSFEREE_FORM());
+      setSchoolRecords([EMPTY_SCHOOL_RECORD()]);
+      setPage(1);
     }
-    // existing skips to page 3, transferee goes to page 1
-    setPage(m === "existing" ? 3 : 1);
   }
 
   // ── Navigation ──
   function handleBack() {
     if (page === 0) { navigate(ROUTES.students.root); return; }
     if (mode === "existing") { setMode(null); setPage(0); return; }
-    // transferee
+    // transferee / migration
     if (page === 1) { setMode(null); setPage(0); return; }
     if (page === 2) { setPage(1); return; }
-    if (page === 3) { setPage(mode === "transferee" ? 2 : 0); return; }
+    if (page === 3) { setPage((mode === "transferee" || mode === "migration") ? 2 : 0); return; }
   }
 
   function handleNext() {
@@ -1372,22 +1472,22 @@ export default function EnrollStudent() {
   // ── Validation ──
   function validateTransfereeInfo(): boolean {
     const fe: Partial<Record<keyof TransfereeForm, string>> = {};
-    if (!transfereeForm.lrn.trim())            fe.lrn       = "LRN is required.";
-    else if (transfereeForm.lrn.length !== 12) fe.lrn       = "Must be exactly 12 digits.";
-    if (!transfereeForm.lastName.trim())       fe.lastName  = "Last name is required.";
-    if (!transfereeForm.firstName.trim())      fe.firstName = "First name is required.";
-    if (!transfereeForm.birthdate)             fe.birthdate = "Birthdate is required.";
+    if (!transfereeForm.lrn.trim()) fe.lrn = "LRN is required.";
+    else if (transfereeForm.lrn.length !== 12) fe.lrn = "Must be exactly 12 digits.";
+    if (!transfereeForm.lastName.trim()) fe.lastName = "Last name is required.";
+    if (!transfereeForm.firstName.trim()) fe.firstName = "First name is required.";
+    if (!transfereeForm.birthdate) fe.birthdate = "Birthdate is required.";
     setTransfereeFormErrors(fe);
     return Object.keys(fe).length === 0;
   }
 
   function validateEnrollment(): boolean {
     const e: Record<string, string> = {};
-    if (mode === "existing" && !selectedStudent)   e.student    = "Please select a student.";
-    if (mode === "existing" && existingEnrollment) e.student    = `Already enrolled in S.Y. ${schoolYear}.`;
-    if (!schoolYear)        e.schoolYear = "Please select a school year.";
-    if (!gradeLevel)        e.gradeLevel = "Please select a grade level.";
-    if (!selectedSectionId) e.section    = "Please select a section.";
+    if (mode === "existing" && !selectedStudent) e.student = "Please select a student.";
+    if (mode === "existing" && existingEnrollment) e.student = `Already enrolled in S.Y. ${schoolYear}.`;
+    if (!schoolYear) e.schoolYear = "Please select a school year.";
+    if (!gradeLevel) e.gradeLevel = "Please select a grade level.";
+    if (!selectedSectionId) e.section = "Please select a section.";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -1396,30 +1496,58 @@ export default function EnrollStudent() {
 
   async function handleSubmit() {
     if (!validateEnrollment()) return;
-    if (mode === "transferee" && !validateTransfereeInfo()) return;
+    if ((mode === "transferee" || mode === "migration") && !validateTransfereeInfo()) return;
 
     try {
       setIsSubmitting(true);
-      if (mode === "transferee") {
-        const newStudent = await addStudent({
-          ...transfereeForm,
-          elementaryGeneralAvg: transfereeForm.elementaryGeneralAvg ? parseFloat(transfereeForm.elementaryGeneralAvg) : undefined,
-          birthdate: transfereeForm.birthdate || undefined
-        });
-        
+      const syId = allYears.find(y => y.label === schoolYear)?.id;
+      if (!syId) throw new Error("Could not find selected school year in database.");
+
+      if (mode === "transferee" || mode === "migration") {
+        const studentToCreate: Partial<Student> = {
+          lrn: transfereeForm.lrn,
+          lastName: transfereeForm.lastName,
+          firstName: transfereeForm.firstName,
+          middleName: transfereeForm.middleName,
+          suffix: transfereeForm.nameExtension === "none" ? "" : transfereeForm.nameExtension,
+          gender: transfereeForm.sex,
+          birthdate: transfereeForm.birthdate || undefined,
+          // Elementary Info
+          elemSchoolName: transfereeForm.elementarySchoolName,
+          elemSchoolId: transfereeForm.elementarySchoolId,
+          elemSchoolAddress: transfereeForm.elementarySchoolAddress,
+          elemGenAverage: transfereeForm.elementaryGeneralAvg ? parseFloat(transfereeForm.elementaryGeneralAvg) : undefined,
+          elemCitation: transfereeForm.elementaryCitation,
+          // Alternative Credentials
+          altCredentialType: transfereeForm.otherCredential,
+          altCredentialRating: transfereeForm.otherCredentialRating,
+          altCredentialExamDate: transfereeForm.credentialExamDate || undefined,
+          altCredentialCenter: transfereeForm.credentialTestingCenter,
+        };
+
+        const { id: newStudentId } = await createStudent(studentToCreate as Student);
+
         await enrollStudent({
-          studentId: newStudent.id,
-          schoolYearId: 1, // To be replaced with actual lookup when school years API is used
+          studentId: newStudentId,
+          schoolYearId: syId,
           gradeLevel: Number(gradeLevel),
           sectionId: selectedSectionId!,
         });
-        // Note: schoolRecords (prior transcript) parsing to be added here when backend endpoint is ready
+
+        // Save prior transcript history (schoolRecords)
+        if (schoolRecords && schoolRecords.length > 0) {
+          // Check if at least one school has valid entries
+          const hasValidRecords = schoolRecords.some(r => r.schoolName.trim() !== "");
+          if (hasValidRecords) {
+            await addTransfereeTranscript(newStudentId, { records: schoolRecords });
+          }
+        }
       } else if (mode === "existing" && selectedStudent) {
         await enrollStudent({
-           studentId: selectedStudent.id,
-           schoolYearId: 1, // To be replaced with actual lookup when school years API is used
-           gradeLevel: Number(gradeLevel),
-           sectionId: selectedSectionId!,
+          studentId: selectedStudent.id,
+          schoolYearId: syId,
+          gradeLevel: Number(gradeLevel),
+          sectionId: selectedSectionId!,
         });
       }
       navigate(ROUTES.students.root, { replace: true });
@@ -1493,13 +1621,13 @@ export default function EnrollStudent() {
               // auto-compute final for non-MAPEH-parent rows
               if (!s.isMapeh || s.mapehComponent) {
                 updated.finalRating = computeFinalRating(updated);
-                updated.remarks     = parseFloat(updated.finalRating) >= 75 ? "Passed" : "Failed";
+                updated.remarks = parseFloat(updated.finalRating) >= 75 ? "Passed" : "Failed";
               }
               return updated;
             });
             // recompute MAPEH parent final as avg of its 4 components
             const mapehComponents = subjects.filter((s) => s.isMapeh && s.mapehComponent);
-            const mapehParentIdx  = subjects.findIndex((s) => s.isMapeh && !s.mapehComponent);
+            const mapehParentIdx = subjects.findIndex((s) => s.isMapeh && !s.mapehComponent);
             if (mapehParentIdx >= 0 && mapehComponents.length > 0) {
               const vals = mapehComponents.map((s) => parseFloat(s.finalRating)).filter((v) => !isNaN(v));
               if (vals.length > 0) {
@@ -1562,93 +1690,81 @@ export default function EnrollStudent() {
   };
 
   // ── Render ──
+  useHeader({
+    breadcrumbs: [
+      { label: "Students", href: ROUTES.students.root },
+      { label: pageTitles[page] },
+    ],
+    extra: (
+      <div className="flex items-center gap-2">
+        {mode && (
+          <Badge className={`text-[10px] h-5 px-2 border-0
+            ${mode === "migration" ? "bg-indigo-100 text-indigo-700" : mode === "transferee" ? "bg-violet-100 text-violet-700" : "bg-teal-100 text-teal-700"}`}>
+            {mode === "migration" ? "Migration" : mode === "transferee" ? "Transferee" : "Existing Student"}
+          </Badge>
+        )}
+        <WizardProgressBar mode={mode} page={page} />
+      </div>
+    ),
+    actions: (
+      <div className="flex gap-2">
+        {renderHeaderActions()}
+      </div>
+    )
+  });
+
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar
-        user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }}
-        onLogout={() => console.log("Logout")}
-      />
+    <div className="flex-1">
+        {page === 0 && (
+          <ModeSelectorPage onSelect={handleModeSelect} />
+        )}
 
-      <main className="flex-1 overflow-y-auto flex flex-col">
-        {/* Top Bar */}
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10 flex-shrink-0">
-          {/* Breadcrumb */}
-          <button
-            onClick={() => navigate(ROUTES.students.root)}
-            className="text-xs text-slate-400 hover:text-slate-600"
-          >
-            Students
-          </button>
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span className="text-xs font-semibold text-slate-600">{pageTitles[page]}</span>
-          {mode && (
-            <>
-              <ChevronRight className="w-3 h-3 text-slate-300" />
-              <Badge className={`text-[10px] h-5 px-2 border-0
-                ${mode === "transferee" ? "bg-violet-100 text-violet-700" : "bg-teal-100 text-teal-700"}`}>
-                {mode === "transferee" ? "Transferee" : "Existing Student"}
-              </Badge>
-            </>
-          )}
+        {(page === 1 && (mode === "transferee" || mode === "migration")) && (
+          <TransfereeInfoPage
+            form={transfereeForm}
+            onChange={(key, val) => {
+              setTransfereeForm((p) => ({ ...p, [key]: val }));
+              setTransfereeFormErrors((p) => ({ ...p, [key]: undefined }));
+            }}
+            errors={transfereeFormErrors}
+            mode={mode}
+          />
+        )}
 
-          {/* Progress bar */}
-          <WizardProgressBar mode={mode} page={page} />
+        {(page === 2 && (mode === "transferee" || mode === "migration")) && (
+          <TranscriptPage
+            records={schoolRecords}
+            onUpdateSchool={updateSchoolField}
+            onRemoveSchool={removeSchool}
+            onAddSchool={addSchool}
+            onUpdateEntry={updateGradeYearField}
+            onRemoveEntry={removeGradeYearEntry}
+            onAddEntry={addGradeYearEntry}
+            onUpdateSubject={updateSubjectField}
+            allYears={allYears}
+          />
+        )}
 
-          {/* Actions */}
-          <div className="ml-auto flex gap-2">
-            {renderHeaderActions()}
-          </div>
-        </header>
+        {page === 3 && (
+          <EnrollmentAssignmentPage
+            mode={mode as any}
+            selectedStudent={selectedStudent}
+            onSelectStudent={setSelectedStudent}
+            transfereeName={transfereeName}
+            schoolYear={schoolYear}
+            onSchoolYear={setSchoolYear}
+            gradeLevel={gradeLevel}
+            onGradeLevel={(v) => { setGradeLevel(v); setSelectedSectionId(null); setSelectedSectionName(""); }}
+            selectedSectionId={selectedSectionId}
+            selectedSectionName={selectedSectionName}
+            onSelectSection={(id, name) => { setSelectedSectionId(id); setSelectedSectionName(name); setErrors((p) => ({ ...p, section: "" })); }}
+            existingEnrollment={existingEnrollment}
+            errors={errors}
+            allYears={allYears}
+            allSections={allSections}
+          />
+        )}
+      </div>
 
-        {/* Page content */}
-        <div className="flex-1">
-          {page === 0 && (
-            <ModeSelectorPage onSelect={handleModeSelect} />
-          )}
-
-          {page === 1 && mode === "transferee" && (
-            <TransfereeInfoPage
-              form={transfereeForm}
-              onChange={(key, val) => {
-                setTransfereeForm((p) => ({ ...p, [key]: val }));
-                setTransfereeFormErrors((p) => ({ ...p, [key]: undefined }));
-              }}
-              errors={transfereeFormErrors}
-            />
-          )}
-
-          {page === 2 && mode === "transferee" && (
-            <TranscriptPage
-              records={schoolRecords}
-              onUpdateSchool={updateSchoolField}
-              onRemoveSchool={removeSchool}
-              onAddSchool={addSchool}
-              onUpdateEntry={updateGradeYearField}
-              onRemoveEntry={removeGradeYearEntry}
-              onAddEntry={addGradeYearEntry}
-              onUpdateSubject={updateSubjectField}
-            />
-          )}
-
-          {page === 3 && (
-            <EnrollmentAssignmentPage
-              mode={mode as "existing" | "transferee"}
-              selectedStudent={selectedStudent}
-              onSelectStudent={setSelectedStudent}
-              transfereeName={transfereeName}
-              schoolYear={schoolYear}
-              onSchoolYear={setSchoolYear}
-              gradeLevel={gradeLevel}
-              onGradeLevel={(v) => { setGradeLevel(v); setSelectedSectionId(null); setSelectedSectionName(""); }}
-              selectedSectionId={selectedSectionId}
-              selectedSectionName={selectedSectionName}
-              onSelectSection={(id, name) => { setSelectedSectionId(id); setSelectedSectionName(name); setErrors((p) => ({ ...p, section: "" })); }}
-              existingEnrollment={existingEnrollment}
-              errors={errors}
-            />
-          )}
-        </div>
-      </main>
-    </div>
   );
 }
