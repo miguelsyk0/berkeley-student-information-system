@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Plus, Pencil, Trash2,
   Search, BookMarked, MoreHorizontal,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, Layers,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,9 +20,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { ROUTES } from "@/routes";
-import { getSubjects } from "@/services/api";
-import { useHeader } from "@/contexts/HeaderContext";
-import type { Subject } from "../types";
+import { getSubjects, deleteSubject, updateSubject, reorderSubject, type Subject } from "@/services/api";
+import { useSetHeader } from "@/contexts/HeaderContext";
+import type { SubjectCluster } from "../types";
+import { CLUSTERS } from "./SubjectForm";
+
+// ── Cluster Badge Helper ───────────────────────────────────────────────────────
+
+function ClusterBadge({ cluster }: { cluster?: SubjectCluster }) {
+  if (!cluster) return <span className="text-slate-300 text-xs">—</span>;
+  const cfg = CLUSTERS.find((c) => c.value === cluster);
+  if (!cfg) return <span className="text-slate-300 text-xs">—</span>;
+  return (
+    <Badge className={`${cfg.badgeClass} text-[10px] h-5 px-1.5`}>{cfg.label}</Badge>
+  );
+}
 
 // ── Subject Row ────────────────────────────────────────────────────────────────
 
@@ -79,17 +91,7 @@ function SubjectRow({
 
         {/* Name */}
         <td className="px-4 py-3.5">
-          <div className="flex items-center gap-2">
-            {subject.isMapeh && (
-              <span className="w-3 border-l-2 border-slate-200 ml-1 self-stretch inline-block" />
-            )}
-            <div>
-              <p className="text-sm font-semibold text-slate-800">{subject.name}</p>
-              {subject.isMapeh && (
-                <p className="text-[10px] text-violet-500 font-semibold">MAPEH sub-subject</p>
-              )}
-            </div>
-          </div>
+          <p className="text-sm font-semibold text-slate-800">{subject.name}</p>
         </td>
 
         {/* SF10 Display Name */}
@@ -97,13 +99,9 @@ function SubjectRow({
           <span className="text-xs text-slate-500">{subject.displayName}</span>
         </td>
 
-        {/* MAPEH flag */}
+        {/* Cluster */}
         <td className="px-4 py-3.5 text-center">
-          {subject.isMapeh ? (
-            <Badge className="bg-violet-100 text-violet-700 border-0 text-[10px] h-4 px-1.5">MAPEH</Badge>
-          ) : (
-            <span className="text-slate-300 text-xs">—</span>
-          )}
+          <ClusterBadge cluster={subject.cluster} />
         </td>
 
         {/* Active toggle */}
@@ -161,11 +159,13 @@ function SubjectRow({
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
+type ClusterFilter = "all" | SubjectCluster;
+
 export default function SubjectList() {
   const navigate = useNavigate();
-  const [subjects, setSubjects] = useState<any[]>([]); 
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [search, setSearch] = useState("");
-  const [filterMapeh, setFilterMapeh] = useState<"all" | "mapeh" | "regular">("all");
+  const [filterCluster, setFilterCluster] = useState<ClusterFilter>("all");
 
   useEffect(() => {
     getSubjects().then(setSubjects).catch(console.error);
@@ -173,53 +173,75 @@ export default function SubjectList() {
 
   const filtered = subjects
     .filter((s) => {
-      const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
+      const matchSearch =
+        s.name.toLowerCase().includes(search.toLowerCase()) ||
         s.code.toLowerCase().includes(search.toLowerCase()) ||
         (s.displayName?.toLowerCase()?.includes(search.toLowerCase()) ?? false);
-      const matchMapeh =
-        filterMapeh === "all" ? true :
-          filterMapeh === "mapeh" ? s.isMapeh :
-            !s.isMapeh;
-      return matchSearch && matchMapeh;
+      const matchCluster =
+        filterCluster === "all" ? true : s.cluster === filterCluster;
+      return matchSearch && matchCluster;
     })
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-  function handleDelete(id: number) {
-    setSubjects((prev) => prev.filter((s) => s.id !== id));
+  async function handleDelete(id: number) {
+    try {
+      const res = await deleteSubject(id);
+      if (res.result === "Subject deleted successfully") {
+        setSubjects((prev) => prev.filter((s) => s.id !== id));
+      } else {
+        alert(res.result || "Failed to delete subject.");
+      }
+    } catch (err) {
+      console.error("Delete subject error:", err);
+      alert("An error occurred while deleting the subject.");
+    }
   }
 
   async function handleToggleActive(id: number) {
-    setSubjects((prev) => prev.map((s) => s.id === id ? { ...s, isActive: !s.isActive } : s));
+    const subject = subjects.find((s) => s.id === id);
+    if (!subject) return;
+
+    try {
+      const newActive = !subject.isActive;
+      await updateSubject(id, {
+        ...subject,
+        isActive: newActive,
+      });
+      setSubjects((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, isActive: newActive } : s))
+      );
+    } catch (err) {
+      console.error("Toggle active error:", err);
+      alert("Failed to update subject status.");
+    }
   }
 
-  function handleMoveUp(id: number) {
-    setSubjects((prev) => {
-      const sorted = [...prev].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      const idx = sorted.findIndex((s) => s.id === id);
-      if (idx <= 0) return prev;
-      const next = sorted.map((s) => ({ ...s }));
-      [next[idx - 1].order, next[idx].order] = [next[idx].order, next[idx - 1].order];
-      return next;
-    });
+  async function handleMoveUp(id: number) {
+    try {
+      await reorderSubject(id, "up");
+      const updated = await getSubjects();
+      setSubjects(updated);
+    } catch (err) {
+      console.error("Move up error:", err);
+    }
   }
 
-  function handleMoveDown(id: number) {
-    setSubjects((prev) => {
-      const sorted = [...prev].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      const idx = sorted.findIndex((s) => s.id === id);
-      if (idx >= sorted.length - 1) return prev;
-      const next = sorted.map((s) => ({ ...s }));
-      [next[idx + 1].order, next[idx].order] = [next[idx].order, next[idx + 1].order];
-      return next;
-    });
+  async function handleMoveDown(id: number) {
+    try {
+      await reorderSubject(id, "down");
+      const updated = await getSubjects();
+      setSubjects(updated);
+    } catch (err) {
+      console.error("Move down error:", err);
+    }
   }
 
   const activeCount = subjects.filter((s) => s.isActive).length;
-  const mapehCount = subjects.filter((s) => s.isMapeh).length;
+  const clusteredCount = subjects.filter((s) => !!s.cluster).length;
 
-  useHeader({
+  useSetHeader({
     title: "Subjects",
-    subtitle: `${subjects.length} subjects · ${activeCount} active · ${mapehCount} MAPEH`,
+    subtitle: `${subjects.length} subjects · ${activeCount} active · ${clusteredCount} clustered`,
     breadcrumbs: [
       { label: "Subjects" },
       { label: "Subject List" },
@@ -248,19 +270,46 @@ export default function SubjectList() {
               className="pl-9 h-8 text-xs bg-white border-slate-200"
             />
           </div>
-          <div className="flex gap-1 bg-white rounded-lg border border-slate-200 p-1">
-            {(["all", "regular", "mapeh"] as const).map((f) => (
+          <div className="flex gap-1 bg-white rounded-lg border border-slate-200 p-1 flex-wrap">
+            <button
+              onClick={() => setFilterCluster("all")}
+              className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                filterCluster === "all"
+                  ? "bg-slate-700 text-white"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              All
+            </button>
+            {CLUSTERS.map((c) => (
               <button
-                key={f}
-                onClick={() => setFilterMapeh(f)}
-                className={`px-3 py-1 rounded text-xs font-semibold transition-colors capitalize ${filterMapeh === f
-                    ? "bg-teal-600 text-white"
+                key={c.value}
+                onClick={() => setFilterCluster(filterCluster === c.value ? "all" : c.value)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                  filterCluster === c.value
+                    ? c.badgeClass
                     : "text-slate-500 hover:text-slate-700"
-                  }`}
+                }`}
               >
-                {f === "all" ? "All" : f === "regular" ? "Regular" : "MAPEH"}
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  c.badgeClass.includes("indigo") ? "bg-indigo-400"
+                  : c.badgeClass.includes("teal") ? "bg-teal-400"
+                  : c.badgeClass.includes("amber") ? "bg-amber-400"
+                  : "bg-violet-400"
+                }`} />
+                {c.label}
               </button>
             ))}
+            <button
+              onClick={() => setFilterCluster(filterCluster === null ? "all" : null)}
+              className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                filterCluster === null
+                  ? "bg-slate-200 text-slate-700"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Unassigned
+            </button>
           </div>
         </div>
 
@@ -279,7 +328,9 @@ export default function SubjectList() {
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Code</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Subject Name</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">SF10 Display Name</th>
-                  <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">MAPEH</th>
+                  <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center justify-center gap-1">
+                    <Layers className="w-3 h-3" /> Cluster
+                  </th>
                   <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Active</th>
                   <th className="px-4 py-3 w-12" />
                 </tr>

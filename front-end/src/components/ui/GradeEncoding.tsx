@@ -795,9 +795,9 @@ export function GeneralAverageView({ onNavigate }: { onNavigate: (page: string, 
               { label: "Passing", value: `${students.filter(s => (s.avg ?? 0) >= 75).length}/${students.length}`, color: "text-slate-700", bg: "bg-white" },
             ].map(({ label, value, color, bg }) => (
               <Card key={label} className={`border-0 shadow-sm ${bg}`}>
-                <CardContent className="px-4 py-3.5 text-center">
-                  <p className={`text-2xl font-black ${color}`}>{value}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{label}</p>
+                <CardContent className="p-5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">{label}</p>
+                  <p className={`text-3xl font-black ${color} leading-none`}>{value}</p>
                 </CardContent>
               </Card>
             ))}

@@ -8,11 +8,11 @@ function Header() {
   const { title, subtitle, breadcrumbs, actions, extra } = useHeader();
 
   return (
-    <header className="h-24 bg-white border-b border-slate-100 flex items-center px-8 gap-4 sticky top-0 z-10">
+    <header className="min-h-[60px] bg-white border-b border-slate-100 flex items-center px-8 gap-4 sticky top-0 z-10 py-3 print:hidden">
       <div className="flex-1 min-w-0">
         {breadcrumbs && breadcrumbs.length > 0 && (
-          <div className="flex items-center gap-2 mb-1.5 opacity-80">
-            {breadcrumbs.map((bc, i) => (
+          <div className="flex items-center gap-1 mb-0.5 opacity-70">
+            {breadcrumbs.map((bc: any, i: number) => (
               <React.Fragment key={i}>
                 {bc.onClick ? (
                   <button
@@ -36,14 +36,14 @@ function Header() {
           </div>
         )}
         
-        <div className="flex flex-col">
+        <div className="flex items-baseline gap-3">
           {title && (
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight leading-none group flex items-center gap-2">
+            <h1 className="text-xl font-black text-slate-800 tracking-tight leading-none">
               {title}
             </h1>
           )}
           {subtitle && (
-            <p className="text-sm text-slate-400 font-medium mt-1">{subtitle}</p>
+            <p className="text-xs text-slate-400 font-medium hidden sm:block">{subtitle}</p>
           )}
         </div>
       </div>
@@ -59,9 +59,9 @@ function Header() {
 export default function MainLayout() {
   return (
     <HeaderProvider>
-      <div className="flex h-screen bg-slate-50 overflow-hidden">
+      <div className="flex h-screen bg-slate-50 overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto flex flex-col relative">
+        <main className="flex-1 overflow-y-auto flex flex-col relative print:overflow-visible print:flex-none print:w-full">
           <Header />
           <Outlet />
         </main>

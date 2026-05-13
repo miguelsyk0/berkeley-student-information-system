@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import {
-  UserCheck, ChevronRight, Search, UserX,
+  UserCheck, Search,
   CheckCircle2, AlertCircle, ArrowRight, Users,
   Plus, Pencil, Trash2, Mail, GraduationCap, RotateCcw
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/StatCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,15 +21,15 @@ import {
   AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import Sidebar from "@/components/sidebar";
 import type { Section, Teacher, SchoolYear } from "@/services/api";
 import { getSections, getTeachers, assignSectionAdviser, getSchoolYears, deleteTeacher, updateTeacher } from "@/services/api";
+import { useSetHeader } from "@/contexts/HeaderContext";
 import TeacherForm from "./TeacherForm";
 
 const GRADE_COLORS: Record<number, string> = {
-  7:  "bg-teal-100 text-teal-800",
-  8:  "bg-violet-100 text-violet-700",
-  9:  "bg-blue-100   text-blue-700",
+  7: "bg-teal-100 text-teal-800",
+  8: "bg-violet-100 text-violet-700",
+  9: "bg-blue-100   text-blue-700",
   10: "bg-cyan-100   text-cyan-700",
 };
 
@@ -135,7 +136,7 @@ function AssignModal({
   );
 }
 
-// ── Teacher Details Modal ────────────────────────────────────────────────────────
+// ── Teacher Details Modal ──────────────────────────────────────────────────────
 
 function TeacherDetailsModal({
   teacher,
@@ -200,7 +201,7 @@ function TeacherDetailsModal({
               <p className="text-xs font-semibold text-slate-800 break-all">{teacher.email || "N/A"}</p>
             </div>
           </div>
-          
+
           {teacher.userId && (
             <div className="bg-teal-50 border border-teal-100 rounded-lg p-3">
               <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wider mb-0.5">Linked User Account ID</p>
@@ -219,14 +220,14 @@ export default function AdviserAssignment() {
   const [sections, setSections] = useState<Section[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
-  
+
   const [sectionSearch, setSectionSearch] = useState("");
   const [teacherSearch, setTeacherSearch] = useState("");
   const [yearFilter, setYearFilter] = useState("1");
-  
+
   const [selectedSection, setSelectedSection] = useState<Section | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [viewingTeacher, setViewingTeacher] = useState<Teacher | null>(null);
@@ -255,7 +256,7 @@ export default function AdviserAssignment() {
   }, [yearFilter]);
 
   const unassigned = sections.filter((s) => !s.adviserId);
-  const assigned   = sections.filter((s) =>  s.adviserId);
+  const assigned = sections.filter((s) => s.adviserId);
   const activeTeachers = teachers.filter((t) => t.isActive);
 
   const filteredSections = sections.filter((s) => {
@@ -304,313 +305,285 @@ export default function AdviserAssignment() {
     setModalOpen(true);
   }
 
+  useSetHeader({
+    title: "Advisers & Teachers",
+    subtitle: "Manage faculty members and assign class advisers.",
+    breadcrumbs: [
+      { label: "School & Sections" },
+      { label: "Advisers & Teachers" },
+    ],
+    extra: (
+      <Select value={yearFilter} onValueChange={setYearFilter}>
+        <SelectTrigger className="h-8 w-32 text-xs border-slate-200 bg-white">
+          <SelectValue placeholder="Select Year" />
+        </SelectTrigger>
+        <SelectContent>
+          {schoolYears.map((sy) => (
+            <SelectItem key={sy.id} value={String(sy.id)}>{sy.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    ),
+  });
+
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar
-        user={{ name: "R. Dela Cruz", role: "Registrar", initials: "RD" }}
-        onLogout={() => console.log("Logout")}
-      />
+    <div className="p-6 space-y-6 w-full">
 
-      <main className="flex-1 overflow-y-auto">
-        {/* Top Bar */}
-        <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-2 sticky top-0 z-10">
-          <span className="text-xs text-slate-400">School & Sections</span>
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-          <span className="text-xs font-semibold text-slate-600">Advisers & Teachers</span>
-          <div className="ml-auto flex gap-2">
-            <Select value={yearFilter} onValueChange={setYearFilter}>
-              <SelectTrigger className="h-8 w-32 text-xs border-slate-200">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {schoolYears.map((sy) => (
-                  <SelectItem key={sy.id} value={String(sy.id)}>{sy.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </header>
+      {/* Summary cards (Top Row) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          label="Assigned Sections"
+          value={assigned.length}
+          icon={CheckCircle2}
+          iconColor="text-emerald-600"
+          iconBg="bg-emerald-50"
+        />
+        <StatCard
+          label="Unassigned Sections"
+          value={unassigned.length}
+          icon={AlertCircle}
+          iconColor="text-amber-600"
+          iconBg="bg-amber-50"
+        />
+        <StatCard
+          label="Total Teachers"
+          value={teachers.length}
+          icon={UserCheck}
+          iconColor="text-teal-600"
+          iconBg="bg-teal-50"
+        />
+        <StatCard
+          label="Active Instructors"
+          value={activeTeachers.length}
+          icon={Users}
+          iconColor="text-blue-600"
+          iconBg="bg-blue-50"
+        />
+      </div>
 
-        <div className="p-6 space-y-6 max-w-7xl mx-auto">
-          <div>
-            <h1 className="text-2xl font-black text-slate-800">Advisers & Teachers</h1>
-            <p className="text-sm text-slate-400 mt-0.5">Manage faculty members and assign class advisers.</p>
-          </div>
+      {/* Split layout: Sections vs Teachers */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
-          {/* Summary cards (Top Row) */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-xl font-black text-slate-800">{assigned.length}</p>
-                  <p className="text-[11px] text-slate-400">Assigned Sections</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
-                  <AlertCircle className="w-4 h-4 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-xl font-black text-slate-800">{unassigned.length}</p>
-                  <p className="text-[11px] text-slate-400">Unassigned Sections</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-teal-100 flex items-center justify-center">
-                  <UserCheck className="w-4 h-4 text-teal-600" />
-                </div>
-                <div>
-                  <p className="text-xl font-black text-slate-800">{teachers.length}</p>
-                  <p className="text-[11px] text-slate-400">Total Teachers</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
-                  <Users className="w-4 h-4 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-xl font-black text-slate-800">{activeTeachers.length}</p>
-                  <p className="text-[11px] text-slate-400">Active Instructors</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Split layout: Sections vs Teachers */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            
-            {/* LEFT COLUMN: Sections */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-black text-slate-800">Assign Advisers</h2>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                  <Input
-                    placeholder="Search sections..."
-                    value={sectionSearch}
-                    onChange={(e) => setSectionSearch(e.target.value)}
-                    className="pl-8 h-8 w-48 text-xs bg-white border-slate-200"
-                  />
-                </div>
-              </div>
-
-              <Card className="border-0 shadow-sm overflow-hidden">
-                <div className="divide-y divide-slate-100 h-[600px] overflow-y-auto">
-                  {filteredSections.map((section) => (
-                    <div key={section.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group">
-                      <div className="flex items-center gap-2 w-32 flex-shrink-0">
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${GRADE_COLORS[section.gradeLevel]}`}>
-                          G{section.gradeLevel}
-                        </span>
-                        <span className="text-xs font-semibold text-slate-700 truncate">{section.name}</span>
-                      </div>
-                      <div className="flex-1 flex items-center gap-2 min-w-0">
-                        {section.adviserName ? (
-                          <>
-                            <Avatar className="w-5 h-5">
-                              <AvatarFallback className="bg-teal-100 text-teal-800 text-[8px] font-bold">
-                                {section.adviserName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-xs font-semibold text-slate-700 truncate">{section.adviserName}</span>
-                          </>
-                        ) : (
-                          <div className="flex items-center gap-1.5 text-amber-600">
-                            <span className="text-xs font-semibold">No adviser</span>
-                          </div>
-                        )}
-                      </div>
-                      <Button
-                        size="sm"
-                        variant={section.adviserName ? "outline" : "default"}
-                        className={`h-7 text-[10px] px-2.5 opacity-0 group-hover:opacity-100 transition-opacity ${
-                          !section.adviserName ? "bg-teal-600 hover:bg-teal-800 text-white" : ""
-                        }`}
-                        onClick={() => openModal(section)}
-                      >
-                        {section.adviserName ? "Reassign" : "Assign"}
-                      </Button>
-                    </div>
-                  ))}
-                  {filteredSections.length === 0 && (
-                     <div className="px-4 py-8 text-center text-slate-400 text-sm">No sections match your search.</div>
-                  )}
-                </div>
-              </Card>
+        {/* LEFT COLUMN: Sections */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-black text-slate-800">Assign Advisers</h2>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <Input
+                placeholder="Search sections..."
+                value={sectionSearch}
+                onChange={(e) => setSectionSearch(e.target.value)}
+                className="pl-8 h-8 w-48 text-xs bg-white border-slate-200"
+              />
             </div>
+          </div>
 
-            {/* RIGHT COLUMN: Teachers */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-black text-slate-800">Teachers</h2>
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                    <Input
-                      placeholder="Search teachers..."
-                      value={teacherSearch}
-                      onChange={(e) => setTeacherSearch(e.target.value)}
-                      className="pl-8 h-8 w-40 text-xs bg-white border-slate-200"
-                    />
+          <Card className="border-0 shadow-sm overflow-hidden">
+            <div className="divide-y divide-slate-100 h-[600px] overflow-y-auto">
+              {filteredSections.map((section) => (
+                <div key={section.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group">
+                  <div className="flex items-center gap-2 w-32 flex-shrink-0">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${GRADE_COLORS[section.gradeLevel]}`}>
+                      G{section.gradeLevel}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-700 truncate">{section.name}</span>
                   </div>
-                  <Button 
+                  <div className="flex-1 flex items-center gap-2 min-w-0">
+                    {section.adviserName ? (
+                      <>
+                        <Avatar className="w-5 h-5">
+                          <AvatarFallback className="bg-teal-100 text-teal-800 text-[8px] font-bold">
+                            {section.adviserName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-xs font-semibold text-slate-700 truncate">{section.adviserName}</span>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-amber-600">
+                        <span className="text-xs font-semibold">No adviser</span>
+                      </div>
+                    )}
+                  </div>
+                  <Button
                     size="sm"
-                    onClick={() => {
-                      setEditingTeacher(null);
-                      setIsFormOpen(true);
-                    }}
-                    className="bg-teal-600 hover:bg-teal-700 text-white h-8 text-xs gap-1"
+                    variant={section.adviserName ? "outline" : "default"}
+                    className={`h-7 text-[10px] px-2.5 opacity-0 group-hover:opacity-100 transition-opacity ${!section.adviserName ? "bg-teal-600 hover:bg-teal-800 text-white" : ""
+                      }`}
+                    onClick={() => openModal(section)}
                   >
-                    <Plus className="w-3.5 h-3.5" /> Add
+                    {section.adviserName ? "Reassign" : "Assign"}
                   </Button>
                 </div>
-              </div>
+              ))}
+              {filteredSections.length === 0 && (
+                <div className="px-4 py-8 text-center text-slate-400 text-sm">No sections match your search.</div>
+              )}
+            </div>
+          </Card>
+        </div>
 
-              <div className="grid grid-cols-1 gap-3 h-[600px] overflow-y-auto content-start">
-                {filteredTeachers.map((teacher) => (
-                  <Card 
-                    key={teacher.id} 
-                    className={`border-0 shadow-sm transition-all group overflow-hidden cursor-pointer hover:shadow-md ${!teacher.isActive ? "opacity-60 grayscale" : ""}`}
-                    onClick={() => setViewingTeacher(teacher)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div className="flex gap-3">
-                          <Avatar className="w-10 h-10 border border-slate-100 rounded-lg">
-                            <AvatarFallback className="bg-slate-50 text-slate-400 rounded-lg text-xs font-bold">
-                              {teacher.firstName?.[0]}{teacher.lastName?.[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <h3 className="text-sm font-bold text-slate-900 leading-tight">
-                              {teacher.firstName} {teacher.lastName}
-                            </h3>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <p className="text-[10px] font-semibold text-teal-600 uppercase tracking-wider">
-                                {teacher.employeeId}
-                              </p>
-                              {!teacher.isActive && (
-                                <Badge variant="secondary" className="text-[8px] h-3.5 px-1 bg-slate-100 text-slate-500">INACTIVE</Badge>
-                              )}
-                            </div>
-                            <div className="flex flex-col gap-1 mt-2">
-                              {teacher.specialization && (
-                                <span className="text-[11px] text-slate-500 flex items-center gap-1.5">
-                                  <GraduationCap className="w-3 h-3 text-slate-300" /> {teacher.specialization}
-                                </span>
-                              )}
-                              {teacher.email && (
-                                <span className="text-[11px] text-slate-500 flex items-center gap-1.5 truncate">
-                                  <Mail className="w-3 h-3 text-slate-300" /> {teacher.email}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                          <Button
-                            variant="ghost" size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingTeacher(teacher);
-                              setIsFormOpen(true);
-                            }}
-                            className="h-7 w-7 rounded-md text-slate-400 hover:text-teal-600 hover:bg-teal-50"
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </Button>
-                          {teacher.isActive && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost" size="icon"
-                                  onClick={e => e.stopPropagation()}
-                                  className="h-7 w-7 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent onClick={e => e.stopPropagation()}>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Deactivate Teacher?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will mark <strong>{teacher.firstName} {teacher.lastName}</strong> as inactive. They will remain in past records but won't be available for new assignments.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction 
-                                    onClick={() => handleDeleteTeacher(teacher.id)}
-                                    className="bg-red-500 hover:bg-red-600"
-                                  >
-                                    Deactivate
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
+        {/* RIGHT COLUMN: Teachers */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-black text-slate-800">Teachers</h2>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <Input
+                  placeholder="Search teachers..."
+                  value={teacherSearch}
+                  onChange={(e) => setTeacherSearch(e.target.value)}
+                  className="pl-8 h-8 w-40 text-xs bg-white border-slate-200"
+                />
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditingTeacher(null);
+                  setIsFormOpen(true);
+                }}
+                className="bg-teal-600 hover:bg-teal-700 text-white h-8 text-xs gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 h-[600px] overflow-y-auto content-start">
+            {filteredTeachers.map((teacher) => (
+              <Card
+                key={teacher.id}
+                className={`border-0 shadow-sm transition-all group overflow-hidden cursor-pointer hover:shadow-md ${!teacher.isActive ? "opacity-60 grayscale" : ""}`}
+                onClick={() => setViewingTeacher(teacher)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex gap-3">
+                      <Avatar className="w-10 h-10 border border-slate-100 rounded-lg">
+                        <AvatarFallback className="bg-slate-50 text-slate-400 rounded-lg text-xs font-bold">
+                          {teacher.firstName?.[0]}{teacher.lastName?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 leading-tight">
+                          {teacher.firstName} {teacher.lastName}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-[10px] font-semibold text-teal-600 uppercase tracking-wider">
+                            {teacher.employeeId}
+                          </p>
                           {!teacher.isActive && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost" size="icon"
-                                  onClick={e => e.stopPropagation()}
-                                  className="h-7 w-7 rounded-md text-slate-400 hover:text-teal-600 hover:bg-teal-50"
-                                >
-                                  <RotateCcw className="w-3 h-3" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent onClick={e => e.stopPropagation()}>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Reactivate Teacher?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will mark <strong>{teacher.firstName} {teacher.lastName}</strong> as active again. They will be available for new section assignments.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction 
-                                    onClick={async () => {
-                                      try {
-                                        await updateTeacher(teacher.id, { ...teacher, isActive: true });
-                                        fetchTeachers();
-                                      } catch (err) {
-                                        console.error(err);
-                                      }
-                                    }}
-                                    className="bg-teal-500 hover:bg-teal-600 text-white"
-                                  >
-                                    Reactivate
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            <Badge variant="secondary" className="text-[8px] h-3.5 px-1 bg-slate-100 text-slate-500">INACTIVE</Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1 mt-2">
+                          {teacher.specialization && (
+                            <span className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                              <GraduationCap className="w-3 h-3 text-slate-300" /> {teacher.specialization}
+                            </span>
+                          )}
+                          {teacher.email && (
+                            <span className="text-[11px] text-slate-500 flex items-center gap-1.5 truncate">
+                              <Mail className="w-3 h-3 text-slate-300" /> {teacher.email}
+                            </span>
                           )}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-                {filteredTeachers.length === 0 && (
-                   <div className="p-6 text-center text-slate-400 text-sm bg-white rounded-xl border border-dashed border-slate-200">
-                     No teachers found. Click "Add" to create one.
-                   </div>
-                )}
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                      <Button
+                        variant="ghost" size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTeacher(teacher);
+                          setIsFormOpen(true);
+                        }}
+                        className="h-7 w-7 rounded-md text-slate-400 hover:text-teal-600 hover:bg-teal-50"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      {teacher.isActive && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost" size="icon"
+                              onClick={e => e.stopPropagation()}
+                              className="h-7 w-7 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent onClick={e => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Deactivate Teacher?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will mark <strong>{teacher.firstName} {teacher.lastName}</strong> as inactive. They will remain in past records but won't be available for new assignments.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteTeacher(teacher.id)}
+                                className="bg-red-500 hover:bg-red-600"
+                              >
+                                Deactivate
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                      {!teacher.isActive && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost" size="icon"
+                              onClick={e => e.stopPropagation()}
+                              className="h-7 w-7 rounded-md text-slate-400 hover:text-teal-600 hover:bg-teal-50"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent onClick={e => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Reactivate Teacher?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will mark <strong>{teacher.firstName} {teacher.lastName}</strong> as active again. They will be available for new section assignments.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={async () => {
+                                  try {
+                                    await updateTeacher(teacher.id, { ...teacher, isActive: true });
+                                    fetchTeachers();
+                                  } catch (err) {
+                                    console.error(err);
+                                  }
+                                }}
+                                className="bg-teal-500 hover:bg-teal-600 text-white"
+                              >
+                                Reactivate
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {filteredTeachers.length === 0 && (
+              <div className="p-6 text-center text-slate-400 text-sm bg-white rounded-xl border border-dashed border-slate-200">
+                No teachers found. Click "Add" to create one.
               </div>
-            </div>
-
+            )}
           </div>
         </div>
-      </main>
+
+      </div>
 
       <AssignModal
         section={selectedSection}
@@ -619,7 +592,7 @@ export default function AdviserAssignment() {
         onClose={() => setModalOpen(false)}
         onAssign={handleAssign}
       />
-      
+
       <TeacherForm
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
@@ -629,7 +602,7 @@ export default function AdviserAssignment() {
         }}
         teacher={editingTeacher}
       />
-      
+
       <TeacherDetailsModal
         teacher={viewingTeacher}
         open={viewingTeacher !== null}

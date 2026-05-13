@@ -6,6 +6,7 @@ import {
   ExternalLink, History,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/StatCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GRADE_COLORS, QUARTER_LABELS } from "@/utils/gradeUtils";
@@ -13,8 +14,7 @@ import { relativeTime } from "@/utils/dateUtils";
 import { getImportHistory } from "@/services/api";
 import type { ImportLog } from "@/services/api";
 import { ROUTES } from "@/routes";
-import { useHeader } from "@/contexts/HeaderContext";
-import React from "react";
+import { useSetHeader } from "@/contexts/HeaderContext";
 
 // ── Import status helpers ──────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ export default function ImportDashboard() {
     .sort((a, b) => new Date(b.importedAt).getTime() - new Date(a.importedAt).getTime())
     .slice(0, 5);
 
-  useHeader({
+  useSetHeader({
     breadcrumbs: [
       { label: "Grade Import" },
       { label: "Import Dashboard" },
@@ -141,24 +141,34 @@ export default function ImportDashboard() {
 
         {/* ── Stat Cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[
-            { label: "Successful", value: successCount, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
-            { label: "Partial", value: partialCount, icon: AlertCircle, color: "text-amber-600", bg: "bg-amber-50" },
-            { label: "Failed", value: failedCount, icon: XCircle, color: "text-red-500", bg: "bg-red-50" },
-            { label: "Rows Encoded", value: totalRowsEncoded, icon: FileSpreadsheet, color: "text-teal-600", bg: "bg-teal-50" },
-          ].map(({ label, value, icon: Icon, color, bg }) => (
-            <Card key={label} className="border-0 shadow-sm">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${bg}`}>
-                  <Icon className={`w-4 h-4 ${color}`} />
-                </div>
-                <div>
-                  <p className="text-xl font-black text-slate-800">{value}</p>
-                  <p className="text-[11px] text-slate-400">{label}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          <StatCard
+            label="Successful"
+            value={successCount}
+            icon={CheckCircle2}
+            iconColor="text-emerald-600"
+            iconBg="bg-emerald-50"
+          />
+          <StatCard
+            label="Partial"
+            value={partialCount}
+            icon={AlertCircle}
+            iconColor="text-amber-600"
+            iconBg="bg-amber-50"
+          />
+          <StatCard
+            label="Failed"
+            value={failedCount}
+            icon={XCircle}
+            iconColor="text-red-500"
+            iconBg="bg-red-50"
+          />
+          <StatCard
+            label="Rows Encoded"
+            value={totalRowsEncoded}
+            icon={FileSpreadsheet}
+            iconColor="text-teal-600"
+            iconBg="bg-teal-50"
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

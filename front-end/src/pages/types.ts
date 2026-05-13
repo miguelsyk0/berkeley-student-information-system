@@ -110,13 +110,20 @@ export interface AcademicRecord {
 
 // ── Subject Management Types ───────────────────────────────────────────────────
 
+export type SubjectCluster =
+  | "Logical Analysis"
+  | "Social Literacy"
+  | "Wika at Pagpapakatao"
+  | "Psychomotor"
+  | null;
+
 export interface Subject {
   id: number;
   code: string;             // Internal code e.g. "LA", "SCI"
   name: string;             // School-specific name e.g. "Science Lab"
   displayName?: string;     // SF10 official DepEd name e.g. "Science"
-  isMapeh?: boolean;        // True if this is a MAPEH sub-subject
-  mapehParentId?: number;   // If isMapeh, the id of the parent MAPEH subject
+  gradeLevel: number;
+  cluster?: SubjectCluster; // Learning cluster grouping
   order?: number;           // Display order in grade sheet
   isActive?: boolean;
 }
@@ -127,8 +134,8 @@ export const defaultSubject: Subject = {
   code: "",
   name: "",
   displayName: "",
-  isMapeh: false,
-  mapehParentId: 0,
+  gradeLevel: 7,
+  cluster: null,
   order: 0,
   isActive: true,
 };

@@ -6,8 +6,12 @@
 /**
  * Computes the average of a grades record (subjectCode -> grade).
  */
-export function computeAvg(grades: Record<string, number | null>): number | null {
-  const vals = Object.values(grades).filter((v): v is number => v !== null);
+export function computeAvg(grades: Record<string, number | string | null | undefined>): number | null {
+  const vals = Object.values(grades)
+    .filter((v) => v !== null && v !== undefined && (v as any) !== "")
+    .map(v => Number(v))
+    .filter(v => !isNaN(v));
+    
   if (vals.length === 0) return null;
   return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100;
 }

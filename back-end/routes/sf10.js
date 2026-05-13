@@ -8,8 +8,9 @@ const router = express.Router();
 router.get("/sf10/:studentId", async (req, res) => {
   try {
     const { studentId } = req.params;
-    const result = await db.one("SELECT * FROM get_sf10_full_history($1)", [studentId]);
-    res.json(result);
+    const history = await db.any("SELECT * FROM get_sf10_full_history($1)", [studentId]);
+    const records = await db.any("SELECT * FROM get_student_academic_records($1)", [studentId]);
+    res.json({ history, records });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch SF10 data" });

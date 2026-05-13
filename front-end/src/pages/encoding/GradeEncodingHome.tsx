@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ChevronRight, CheckCircle2, AlertCircle, ClipboardList, BarChart2,
+  CheckCircle2, AlertCircle, ClipboardList, BarChart2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,18 +12,17 @@ import {
 } from "@/components/ui/select";
 import { GRADE_COLORS } from "@/utils/gradeUtils";
 import { ROUTES } from "@/routes";
-import { getSections, getSchoolYears } from "@/services/api";
-import { useHeader } from "@/contexts/HeaderContext";
-import type { Section, SchoolYear } from "@/services/api";
-import React from "react";
+import { getSchoolYears, getEncodingProgress } from "@/services/api";
+import { useSetHeader } from "@/contexts/HeaderContext";
+import type { SchoolYear } from "@/services/api";
 
 export default function GradeEncodingHome() {
   const navigate = useNavigate();
   const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
   const [schoolYearId, setSchoolYearId] = useState<string>("");
-  const [sections, setSections] = useState<Section[]>([]);
   const [gradeFilter, setGradeFilter] = useState("all");
   const [quarter, setQuarter] = useState("1");
+  const [sectionData, setSectionData] = useState<any[]>([]);
 
 
   useEffect(() => {
@@ -41,25 +40,27 @@ export default function GradeEncodingHome() {
   }, []);
 
   useEffect(() => {
-    if (!schoolYearId) return;
-    getSections(Number(schoolYearId)).then(setSections).catch(console.error);
-  }, [schoolYearId]);
+    if (!schoolYearId || !quarter) return;
+    getEncodingProgress(Number(schoolYearId), Number(quarter))
+      .then((data) => {
+        setSectionData(data.map(s => ({
+          ...s,
+          complete: s.encoded === s.total && s.total > 0
+        })));
+      })
+      .catch(console.error);
+  }, [schoolYearId, quarter]);
 
-  const filtered = sections.filter(
-    (s) => gradeFilter === "all" || String(s.gradeLevel) === gradeFilter
-  );
+  const filtered = useMemo(() => {
+    return sectionData.filter(
+      (s) => gradeFilter === "all" || String(s.gradeLevel) === gradeFilter
+    );
+  }, [sectionData, gradeFilter]);
 
-  // For now, mockup some progress stats since the backend doesn't provide them yet
-  const sectionData = filtered.map((s) => {
-    const total = s.enrolledCount || 0;
-    const encoded = Math.floor(total * (0.7 + Math.random() * 0.3)); // Placeholder progress
-    return { ...s, encoded, total, complete: encoded === total && total > 0 };
-  });
-
-  const completeCount = sectionData.filter((s) => s.complete).length;
+  const completeCount = filtered.filter((s) => s.complete).length;
   const currentYearLabel = schoolYears.find(y => String(y.id) === schoolYearId)?.label || "---";
 
-  useHeader({
+  useSetHeader({
     breadcrumbs: [
       { label: "Grade Encoding" },
       { label: "Home" },
@@ -149,11 +150,11 @@ export default function GradeEncodingHome() {
 
         {/* Section Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-          {sectionData.map((sec) => (
+          {filtered.map((sec) => (
             <Card
               key={sec.id}
               className="border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
-              onClick={() => navigate(ROUTES.grades.classSheet(sec.name))}
+              onClick={() => navigate(`${ROUTES.grades.classSheet(sec.name)}?gradeLevel=${sec.gradeLevel}&quarter=${quarter}&schoolYearId=${schoolYearId}`)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">

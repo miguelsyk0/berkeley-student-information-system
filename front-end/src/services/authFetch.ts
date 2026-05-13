@@ -1,6 +1,8 @@
 import { getAuth } from "firebase/auth";
 
-const BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:4000/api" : "/api");
+const BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV 
+  ? (import.meta.env.VITE_DEVELOPMENT_API_URL || "http://localhost:4000/api")
+  : (import.meta.env.VITE_PRODUCTION_API_URL || "/api"));
 
 /**
  * Authenticated fetch wrapper.

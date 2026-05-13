@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from "react";
+import React, { createContext, useContext, useEffect, useSyncExternalStore } from "react";
 
 interface Breadcrumb {
   label: string;
@@ -6,7 +6,7 @@ interface Breadcrumb {
   onClick?: () => void;
 }
 
-interface HeaderData {
+export interface HeaderData {
   title?: string;
   subtitle?: string;
   breadcrumbs?: Breadcrumb[];
@@ -14,69 +14,76 @@ interface HeaderData {
   extra?: React.ReactNode;
 }
 
-interface HeaderContextType extends HeaderData {
-  setHeader: (data: HeaderData) => void;
-}
+// ── External Store for Header State ───────────────────────────────────────────
+// This store lives outside the React component tree to avoid triggering
+// full layout re-renders when only the header needs to update.
 
-const HeaderContext = createContext<HeaderContextType | undefined>(undefined);
+type Listener = () => void;
+let currentHeaderData: HeaderData = {};
+let listeners: Listener[] = [];
+
+const headerStore = {
+  subscribe(listener: Listener) {
+    listeners.push(listener);
+    return () => {
+      listeners = listeners.filter((l) => l !== listener);
+    };
+  },
+  getSnapshot() {
+    return currentHeaderData;
+  },
+  setData(newData: HeaderData) {
+    currentHeaderData = newData;
+    listeners.forEach((l) => l());
+  },
+};
+
+// ── Contexts ──────────────────────────────────────────────────────────────────
+// We still use context to provide the dispatch function, but the state
+// is now consumed via the subscription.
+
+const HeaderDispatchContext = createContext<((data: HeaderData) => void) | undefined>(undefined);
 
 export function HeaderProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<HeaderData>({});
-
-  const setHeader = useCallback((newData: HeaderData) => {
-    setState(newData);
-  }, []);
-
-  const value = useMemo(() => ({ ...state, setHeader }), [state, setHeader]);
+  const setHeader = (newData: HeaderData) => {
+    headerStore.setData(newData);
+  };
 
   return (
-    <HeaderContext.Provider value={value}>
+    <HeaderDispatchContext.Provider value={setHeader}>
       {children}
-    </HeaderContext.Provider>
+    </HeaderDispatchContext.Provider>
   );
 }
 
 /**
- * useHeader — sets the page header. Pass your header data as the first argument.
- *
- * The hook is "infinity-safe": it uses a ref to track the latest initialData,
- * and only re-fires when the SERIALIZABLE fields (title, subtitle, breadcrumbs)
- * actually change — not when JSX references (actions, extra) recreate on each render.
+ * useHeader — gets the current header state. Used in Layouts.
+ * 
+ * Uses useSyncExternalStore to subscribe to the header store.
+ * Only components calling this hook will re-render when the header updates.
  */
-export function useHeader(initialData?: HeaderData) {
-  const context = useContext(HeaderContext);
-  if (!context) {
-    throw new Error("useHeader must be used within a HeaderProvider");
+export function useHeader() {
+  return useSyncExternalStore(
+    headerStore.subscribe,
+    headerStore.getSnapshot
+  );
+}
+
+/**
+ * useSetHeader — sets the page header. Used in Pages.
+ * 
+ * This hook ONLY consumes the dispatch context, so it doesn't subscribe
+ * to header updates. Calling it will NEVER cause the calling component
+ * to re-render, fundamentally preventing infinite loops.
+ */
+export function useSetHeader(data: HeaderData | undefined) {
+  const dispatch = useContext(HeaderDispatchContext);
+  if (dispatch === undefined) {
+    throw new Error("useSetHeader must be used within a HeaderProvider");
   }
 
-  const { setHeader } = context;
-
-  // Always keep a ref to the LATEST initialData so we can read it in the effect
-  // without making it part of the dependency array (which would cause infinite loops
-  // for objects/JSX created inline on every render).
-  const dataRef = useRef<HeaderData | undefined>(initialData);
-  dataRef.current = initialData;
-
-  // Only depend on the serializable subset of the header data.
-  // Changes to `actions` / `extra` (ReactNode) won't cause infinite loops,
-  // but they WILL be committed because we read from dataRef.current.
-  const stableKey = useMemo(() => {
-    if (!initialData) return "";
-    return JSON.stringify({
-      title: initialData.title,
-      subtitle: initialData.subtitle,
-      breadcrumbs: initialData.breadcrumbs,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialData?.title, initialData?.subtitle, initialData?.breadcrumbs]);
-
   useEffect(() => {
-    if (dataRef.current) {
-      setHeader(dataRef.current);
-    }
-    // Only re-run when serializable fields or setHeader change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stableKey, setHeader]);
-
-  return context;
+    if (!data) return;
+    dispatch(data);
+  }, [data, dispatch]);
 }

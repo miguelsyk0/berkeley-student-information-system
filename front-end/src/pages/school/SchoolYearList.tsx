@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  CalendarDays, ChevronRight, Plus, Pencil, Trash2,
+  CalendarDays, Plus, Pencil, Trash2,
   ChevronDown, ChevronUp, CheckCircle2, Circle,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -15,10 +15,7 @@ import {
 import type { SchoolYear, Quarter } from "../types";
 import SchoolYearForm from "./SchoolYearForm";
 import { getSchoolYears, addSchoolYear, updateSchoolYear, deleteSchoolYear } from "@/services/api";
-import { useHeader } from "@/contexts/HeaderContext";
-import React from "react";
-import { ROUTES } from "@/routes";
-
+import { useSetHeader } from "@/contexts/HeaderContext";
 
 // ── Quarter Status Icon ────────────────────────────────────────────────────────
 
@@ -34,10 +31,10 @@ function QuarterStatus({ quarter, syActive }: { quarter: Quarter; syActive: bool
 
 function QuarterRow({ quarter, syActive, onEdit }: { quarter: Quarter; syActive: boolean; onEdit: (q: Quarter) => void }) {
   return (
-    <div className="flex items-center gap-3 py-2.5 px-4 rounded-lg hover:bg-slate-50 group transition-colors">
+    <div className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-slate-50 group transition-colors">
       <QuarterStatus quarter={quarter} syActive={syActive} />
-      <div className="flex-1">
-        <p className={`text-xs font-semibold ${quarter.isActive && syActive ? "text-teal-800" : "text-slate-600"}`}>
+      <div className="flex-1 min-w-0">
+        <p className={`text-xs font-semibold truncate ${quarter.isActive && syActive ? "text-teal-800" : "text-slate-600"}`}>
           {quarter.label}
           {quarter.isActive && syActive && (
             <Badge className="ml-2 bg-teal-100 text-teal-600 text-[9px] h-4 px-1.5 border-0">Active</Badge>
@@ -53,7 +50,7 @@ function QuarterRow({ quarter, syActive, onEdit }: { quarter: Quarter; syActive:
         onClick={() => onEdit(quarter)}
         className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-teal-600 transition-all p-1 rounded"
       >
-        <Pencil className="w-3.5 h-3.5" />
+        <Pencil className="w-3 h-3" />
       </button>
     </div>
   );
@@ -75,29 +72,29 @@ function SchoolYearCard({
   const [expanded, setExpanded] = useState(sy.isActive);
 
   return (
-    <Card className={`border-0 shadow-sm overflow-hidden transition-all ${sy.isActive ? "ring-2 ring-teal-200" : ""}`}>
-      {/* Header */}
+    <Card className={`border-0 shadow-sm overflow-hidden transition-all flex flex-col ${sy.isActive ? "border-l-4 border-l-teal-400" : "border-l-4 border-l-transparent"}`}>
+
       <div
-        className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-slate-50 transition-colors"
+        className="flex items-start gap-3 px-4 py-3.5 cursor-pointer hover:bg-slate-50 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${sy.isActive ? "bg-teal-600" : "bg-slate-100"}`}>
-          <CalendarDays className={`w-5 h-5 ${sy.isActive ? "text-white" : "text-slate-400"}`} />
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${sy.isActive ? "bg-teal-600" : "bg-slate-100"}`}>
+          <CalendarDays className={`w-4.5 h-4.5 ${sy.isActive ? "text-white" : "text-slate-400"}`} />
         </div>
 
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-black text-slate-800">S.Y. {sy.label}</h3>
             {sy.isActive && <Badge className="bg-emerald-100 text-emerald-700 text-[10px] h-4 px-1.5 border-0">Active</Badge>}
           </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">
-            {new Date(sy.startDate).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}
+          <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+            {new Date(sy.startDate).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
             {" – "}
-            {new Date(sy.endDate).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })}
+            {new Date(sy.endDate).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
           </p>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(sy); }}
             className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
@@ -132,7 +129,7 @@ function SchoolYearCard({
             </AlertDialog>
           )}
 
-          <div className="ml-1 text-slate-400">
+          <div className="ml-0.5 text-slate-400">
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
         </div>
@@ -141,7 +138,7 @@ function SchoolYearCard({
       {/* Quarters */}
       {expanded && (
         <div className="border-t border-slate-100 bg-slate-50/50 px-2 py-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-4 py-1.5">Quarters</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 py-1.5">Quarters</p>
           {sy.quarters.map((q) => (
             <QuarterRow key={q.id} quarter={q} syActive={sy.isActive} onEdit={onEditQuarter} />
           ))}
@@ -172,7 +169,6 @@ export default function SchoolYearList() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm("Are you sure you want to delete this school year?")) return;
     try {
       await deleteSchoolYear(id);
       setSchoolYears((prev) => prev.filter((sy) => sy.id !== id));
@@ -196,10 +192,22 @@ export default function SchoolYearList() {
     try {
       if (editingSY) {
         const updated = await updateSchoolYear(editingSY.id, data);
-        setSchoolYears((prev) => prev.map((s) => (s.id === editingSY.id ? updated : s)));
+        setSchoolYears((prev) =>
+          prev.map((s) => {
+            // If the updated year is now active, deactivate all others in local state too
+            if (s.id === editingSY.id) return updated;
+            if (data.isActive) return { ...s, isActive: false };
+            return s;
+          })
+        );
       } else {
         const added = await addSchoolYear(data);
-        setSchoolYears((prev) => [...prev, added]);
+        // If the new year is active, deactivate all others locally
+        if (data.isActive) {
+          setSchoolYears((prev) => [...prev.map(s => ({ ...s, isActive: false })), added]);
+        } else {
+          setSchoolYears((prev) => [...prev, added]);
+        }
       }
       setFormOpen(false);
     } catch (err) {
@@ -208,7 +216,7 @@ export default function SchoolYearList() {
     }
   }
 
-  useHeader({
+  useSetHeader({
     title: "School Years",
     subtitle: "Manage academic years and their quarterly periods",
     breadcrumbs: [
@@ -223,19 +231,26 @@ export default function SchoolYearList() {
     )
   });
 
+  // Sort: active first, then by label descending (newest year first)
+  const sorted = [...schoolYears].sort((a, b) => {
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+    return b.label.localeCompare(a.label);
+  });
+
   return (
     <>
-      <div className="p-6 max-w-2xl space-y-4">
-
-        {schoolYears.map((sy) => (
-          <SchoolYearCard
-            key={sy.id}
-            sy={sy}
-            onEdit={openEdit}
-            onDelete={handleDelete}
-            onEditQuarter={() => openEdit(sy)}
-          />
-        ))}
+      <div className="p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+          {sorted.map((sy) => (
+            <SchoolYearCard
+              key={sy.id}
+              sy={sy}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+              onEditQuarter={() => openEdit(sy)}
+            />
+          ))}
+        </div>
       </div>
 
       <SchoolYearForm

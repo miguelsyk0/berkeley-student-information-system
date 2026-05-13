@@ -10,13 +10,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { GRADE_COLORS } from "@/utils/gradeUtils";
 import { ROUTES } from "@/routes";
 import { getStudents, getSections } from "@/services/api";
-import { useHeader } from "@/contexts/HeaderContext";
+import { useSetHeader } from "@/contexts/HeaderContext";
 import type { Student, Section } from "@/services/api";
-import React from "react";
 
 export default function SF10Home() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const [sectionSearch, setSectionSearch] = useState("");
   const [students, setStudents] = useState<Student[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
 
@@ -39,7 +39,13 @@ export default function SF10Home() {
       s.lrn.includes(search)
   );
 
-  useHeader({
+  const filteredSections = sections.filter(
+    (sec) =>
+      sec.name.toLowerCase().includes(sectionSearch.toLowerCase()) ||
+      String(sec.gradeLevel).includes(sectionSearch)
+  );
+
+  useSetHeader({
     title: "SF10 Generation",
     subtitle: "Permanent records management and bulk export",
     breadcrumbs: [
@@ -122,8 +128,17 @@ export default function SF10Home() {
           {/* Section quick-access */}
           <div className="space-y-3">
             <p className="text-sm font-black text-slate-700">Sections</p>
-            <div className="grid grid-cols-2 gap-2">
-              {sections.map((sec) => {
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <Input
+                placeholder="Search section or grade..."
+                value={sectionSearch}
+                onChange={(e) => setSectionSearch(e.target.value)}
+                className="pl-9 h-9 text-sm border-slate-200 bg-white"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2 overflow-y-auto max-h-[400px] pr-1 scrollbar-thin scrollbar-thumb-slate-200">
+              {filteredSections.map((sec) => {
                 const gl = sec.gradeLevel;
                 return (
                   <Card

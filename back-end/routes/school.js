@@ -93,6 +93,15 @@ router.post("/years", async (req, res) => {
 router.put("/years/:id", async (req, res) => {
   try {
     const { label, startDate, endDate, isActive, quarters } = req.body;
+
+    // ── Exclusive activation: only one school year may be active at a time ──
+    if (isActive) {
+      await db.none(
+        "UPDATE school_years SET is_active = false WHERE id != $1",
+        [req.params.id]
+      );
+    }
+
     const result = await db.oneOrNone(
       "SELECT * FROM update_school_year($1,$2,$3,$4,$5,$6)",
       [req.params.id, label, startDate, endDate, isActive || false, JSON.stringify(quarters || [])]

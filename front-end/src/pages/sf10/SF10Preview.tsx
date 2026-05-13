@@ -1,81 +1,20 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { getStudentDetails, getSubjects } from "@/services/api";
 import type { Student, Subject } from "@/services/api";
 
-async function exportToPDF(elementId: string, filename: string) {
-  const { default: html2canvas } = await import("html2canvas");
-  const { default: jsPDF } = await import("jspdf");
+import depedSeal from "@/assets/Department_of_Education.png";
+import depedWordmark from "@/assets/Department_of_Education_(DepEd).png";
 
-  const el = document.getElementById(elementId);
-  if (!el) return;
-
-  const canvas = await html2canvas(el, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: "#ffffff",
-    logging: false,
-  });
-
-  const imgData = canvas.toDataURL("image/png");
-  const pdf = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "legal", // SF10 is typically on legal size paper
-  });
-
-  const pageW = pdf.internal.pageSize.getWidth();
-  const pageH = pdf.internal.pageSize.getHeight();
-
-  const imgW = canvas.width;
-  const imgH = canvas.height;
-  const ratio = imgW / imgH;
-
-  const pdfW = pageW;
-  const pdfH = pdfW / ratio;
-
-  // If content is taller than one page, split across pages
-  if (pdfH <= pageH) {
-    pdf.addImage(imgData, "PNG", 0, 0, pdfW, pdfH);
-  } else {
-    let yOffset = 0;
-    const sliceH = (pageH / pdfH) * imgH;
-
-    while (yOffset < imgH) {
-      const sliceCanvas = document.createElement("canvas");
-      sliceCanvas.width = imgW;
-      sliceCanvas.height = Math.min(sliceH, imgH - yOffset);
-      const ctx = sliceCanvas.getContext("2d")!;
-      ctx.drawImage(canvas, 0, -yOffset, imgW, imgH);
-      const sliceData = sliceCanvas.toDataURL("image/png");
-      const slicePdfH = (sliceCanvas.height / imgH) * pdfH;
-
-      if (yOffset > 0) pdf.addPage();
-      pdf.addImage(sliceData, "PNG", 0, 0, pdfW, slicePdfH);
-
-      yOffset += sliceH;
-    }
-  }
-
-  pdf.save(filename);
+// Print-to-PDF: uses browser's native print dialog (works with "Save as PDF").
+// No html2canvas needed — the DOM renders perfectly at print resolution.
+function triggerPrint() {
+  window.print();
 }
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
 
-const LEARNING_AREAS = [
-  { code: "FIL",  name: "Filipino",                           indent: false },
-  { code: "ENG",  name: "English",                            indent: false },
-  { code: "MATH", name: "Mathematics",                        indent: false },
-  { code: "SCI",  name: "Science",                            indent: false },
-  { code: "AP",   name: "Araling Panlipunan (AP)",            indent: false },
-  { code: "ESP",  name: "Edukasyon sa Pagpapakatao (EsP)",    indent: false },
-  { code: "TLE",  name: "Technology and Livelihood Education (TLE)", indent: false },
-  { code: "MAPEH",name: "MAPEH",                              indent: false, isGroup: true },
-  { code: "MUS",  name: "Music",                              indent: true  },
-  { code: "ARTS", name: "Arts",                               indent: true  },
-  { code: "PE",   name: "Physical Education",                 indent: true  },
-  { code: "HLT",  name: "Health",                             indent: true  },
-];
+// ─── Shared helpers ────────────────────────────────────────────────────────────
 
 // Border-collapse table styles as inline style objects (Tailwind can conflict
 // with border-collapse in print; we use a mix of Tailwind + inline)
@@ -83,14 +22,18 @@ const TH = "border border-black px-1 py-0.5 text-center text-[9px] font-bold";
 const TD = "border border-black px-1 py-0.5 text-center text-[9px]";
 const TDL = "border border-black px-1 py-0.5 text-left text-[9px]";
 
+const CALIBRI = "Calibri, 'Segoe UI', Candara, Bitstream Vera Sans, DejaVu Sans, Geneva, Trebuchet MS, Verdana, sans-serif";
+
 interface GradeEntry {
   q1?: number | null;
   q2?: number | null;
   q3?: number | null;
   q4?: number | null;
+  final?: number | null;
+  remarks?: string | null;
 }
 
-interface ScholasticRecord {
+export interface ScholasticRecord {
   school: string;
   schoolId: string;
   district: string;
@@ -100,7 +43,8 @@ interface ScholasticRecord {
   section: string;
   schoolYear: string;
   adviser: string;
-  grades: Record<string, GradeEntry>;
+  grades: Record<string, GradeEntry>; // Key is subject_name or displayName
+  generalAvg?: number | null;
 }
 
 function getRemarks(final: number | null): string {
@@ -110,39 +54,20 @@ function getRemarks(final: number | null): string {
 
 function calcFinal(entry: GradeEntry | undefined): number | null {
   if (!entry) return null;
-  const vals = [entry.q1, entry.q2, entry.q3, entry.q4].filter(
-    (v): v is number => v != null
-  );
-  if (vals.length < 2) return null;
-  return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
-}
-
-function calcGeneralAvg(grades: Record<string, GradeEntry>): number | null {
-  // Use only main subjects (not MAPEH sub-components) for gen avg
-  const mainCodes = ["FIL","ENG","MATH","SCI","AP","ESP","TLE","MAPEH"];
-  const finals: number[] = [];
-  for (const code of mainCodes) {
-    if (code === "MAPEH") {
-      // MAPEH avg = avg of Music, Arts, PE, Health
-      const mapehSubs = ["MUS","ARTS","PE","HLT"];
-      const mapehVals = mapehSubs.map((c) => calcFinal(grades[c])).filter((v): v is number => v != null);
-      if (mapehVals.length > 0) finals.push(Math.round(mapehVals.reduce((a, b) => a + b) / mapehVals.length));
-    } else {
-      const f = calcFinal(grades[code]);
-      if (f != null) finals.push(f);
-    }
-  }
-  if (finals.length === 0) return null;
-  return Math.round((finals.reduce((a, b) => a + b, 0) / finals.length) * 100) / 100;
+  return entry.final ?? null;
 }
 
 // ─── Grade Table ───────────────────────────────────────────────────────────────
 
-function GradeTable({ record }: { record: ScholasticRecord }) {
-  const genAvg = calcGeneralAvg(record.grades);
+function GradeTable({ record, subjects }: { record: ScholasticRecord; subjects: Subject[] }) {
+  // Sort subjects by order (sort_order from DB)
+  const sortedSubjects = [...(subjects || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  // Use record's genAvg from DB
+  const genAvg = record.generalAvg ? Number(record.generalAvg) : null;
 
   return (
-    <table className="w-full text-[9px]" style={{ borderCollapse: "collapse" }}>
+    <table className="w-full text-[9px]" style={{ borderCollapse: "collapse", fontFamily: CALIBRI }}>
       <thead>
         <tr>
           <th className={`${TH} text-left w-[44%]`} rowSpan={2}>LEARNING AREAS</th>
@@ -159,39 +84,28 @@ function GradeTable({ record }: { record: ScholasticRecord }) {
         </tr>
       </thead>
       <tbody>
-        {LEARNING_AREAS.map((area) => {
-          const entry = record.grades[area.code];
-
-          if (area.isGroup) {
-            return (
-              <tr key={area.code}>
-                <td className={TDL}>{area.name}</td>
-                {[null, null, null, null].map((_, i) => (
-                  <td key={i} className={TD}></td>
-                ))}
-                <td className={TD}></td>
-                <td className={TD}></td>
-              </tr>
-            );
-          }
+        {sortedSubjects.map((subj) => {
+          const areaName = subj.displayName || subj.name;
+          const entry = record.grades[areaName] || record.grades[subj.name];
 
           const q1 = entry?.q1 ?? null;
           const q2 = entry?.q2 ?? null;
           const q3 = entry?.q3 ?? null;
           const q4 = entry?.q4 ?? null;
           const final = calcFinal(entry);
+          const remarks = entry?.remarks || (final != null ? getRemarks(final) : "");
 
           return (
-            <tr key={area.code}>
-              <td className={`${TDL} ${area.indent ? "pl-5" : ""}`}>
-                {area.indent ? `    ${area.name}` : area.name}
+            <tr key={subj.code}>
+              <td className={TDL}>
+                {areaName}
               </td>
               <td className={TD}>{q1 ?? ""}</td>
               <td className={TD}>{q2 ?? ""}</td>
               <td className={TD}>{q3 ?? ""}</td>
               <td className={TD}>{q4 ?? ""}</td>
               <td className={`${TD} font-bold`}>{final ?? ""}</td>
-              <td className={TD}>{final != null ? getRemarks(final) : ""}</td>
+              <td className={TD}>{remarks}</td>
             </tr>
           );
         })}
@@ -212,14 +126,14 @@ function GradeTable({ record }: { record: ScholasticRecord }) {
 function RemedialTable() {
   return (
     <>
-      <div className="flex items-baseline gap-1 text-[9px] mt-1">
+      <div className="flex items-baseline gap-1 text-[9px] mt-1" style={{ fontFamily: CALIBRI }}>
         <span className="font-bold">Remedial Classes</span>
         <span className="ml-2">Conducted from (mm/dd/yyyy)</span>
         <span className="border-b border-black inline-block w-36 mx-1"></span>
         <span>to (mm/dd/yyyy)</span>
         <span className="border-b border-black inline-block w-36 mx-1"></span>
       </div>
-      <table className="w-full text-[9px] mt-0.5" style={{ borderCollapse: "collapse" }}>
+      <table className="w-full text-[9px] mt-0.5" style={{ borderCollapse: "collapse", fontFamily: CALIBRI }}>
         <thead>
           <tr>
             <th className={`${TH} text-left`}>Learning Areas</th>
@@ -247,9 +161,9 @@ function RemedialTable() {
 
 // ─── Scholastic Block (school info + grade table + remedial) ───────────────────
 
-function ScholasticBlock({ record }: { record: ScholasticRecord }) {
+function ScholasticBlock({ record, subjects }: { record: ScholasticRecord; subjects: Subject[] }) {
   return (
-    <div className="mb-3">
+    <div className="mb-3" style={{ fontFamily: CALIBRI }}>
       <p className="text-[9px]">
         School: <span className="font-semibold">{record.school}</span>
         {"  "}School ID: <span className="font-semibold">{record.schoolId}</span>
@@ -265,84 +179,50 @@ function ScholasticBlock({ record }: { record: ScholasticRecord }) {
         {"  "}Signature:{" "}
         <span className="border-b border-black inline-block w-24"></span>
       </p>
-      <GradeTable record={record} />
+      <GradeTable record={record} subjects={subjects} />
       <RemedialTable />
     </div>
   );
 }
 
-// ─── Build mock records from existing mock data ────────────────────────────────
-
-function buildGradesFromMock(subjects: Subject[]): Record<string, GradeEntry> {
-  const grades: Record<string, GradeEntry> = {};
-  for (const subj of subjects) {
-    grades[subj.code] = {
-      q1: 85,
-      q2: 88,
-      q3: 90,
-      q4: 92,
-    };
-  }
-  return grades;
-}
-
-function buildPriorGrades(subjects: Subject[]): Record<string, GradeEntry> {
-  const grades: Record<string, GradeEntry> = {};
-  for (const subj of subjects) {
-    grades[subj.code] = {
-      q1: Math.round(78 + Math.random() * 18),
-      q2: Math.round(78 + Math.random() * 18),
-      q3: Math.round(78 + Math.random() * 18),
-      q4: Math.round(78 + Math.random() * 18),
-    };
-  }
-  return grades;
-}
-
 // ─── Front Page ────────────────────────────────────────────────────────────────
 
-export function SF10FrontPage({ student, subjects }: { student: any; subjects: Subject[] }) {
-  const nameParts = student.name.split(",");
+export function SF10FrontPage({ student, subjects, records }: { student: any; subjects: Subject[]; records: ScholasticRecord[] }) {
+  const nameParts = student.name?.split(",") || [];
   const lastName  = nameParts[0]?.trim() ?? "";
   const firstRest = nameParts[1]?.trim().split(" ") ?? [];
   const firstName = firstRest[0] ?? "";
-  const midName   = "Santos"; // placeholder
+  const midName   = student.middleName || "";
 
-  const grade8Record: ScholasticRecord = {
-    school:      "DepEd JHS Model School",
-    schoolId:    "301028",
-    district:    "Quezon City District IV",
-    division:    "Quezon City",
-    region:      "NCR",
-    gradeLevel:  8,
-    section:     "Rizal",
-    schoolYear:  "2025–2026",
-    adviser:     "R. Dela Cruz",
-    grades:      buildGradesFromMock(subjects),
-  };
+  const emptyRecord = (gl: number): ScholasticRecord => ({
+    school: "", schoolId: "", district: "", division: "", region: "",
+    gradeLevel: gl, section: "", schoolYear: "", adviser: "", grades: {}
+  });
 
-  const grade7Record: ScholasticRecord = {
-    ...grade8Record,
-    gradeLevel: 7,
-    section:    "Bonifacio",
-    schoolYear: "2024–2025",
-    adviser:    "M. Santos",
-    grades:     buildPriorGrades(subjects),
-  };
+  const grade7Record = records.find(r => r.gradeLevel === 7) || emptyRecord(7);
+  const grade8Record = records.find(r => r.gradeLevel === 8) || emptyRecord(8);
 
   return (
     <div
-      className="bg-white text-black font-sans"
-      style={{ width: "816px", padding: "28px 32px", fontSize: "10px" }}
+      className="bg-white text-black"
+      style={{ width: "816px", padding: "28px 32px", fontSize: "10px", fontFamily: CALIBRI }}
     >
       {/* ── Header ── */}
-      <div className="text-center mb-2 border-b-2 border-black pb-2">
-        <p className="text-[9px]">Republic of the Philippines</p>
-        <p className="text-[9px]">Department of Education</p>
-        <p className="text-[13px] font-black uppercase mt-1">
-          Learner's Permanent Academic Record for Junior High School (SF10-JHS)
-        </p>
-        <p className="text-[9px]">(Formerly Form 137)</p>
+      <div className="relative text-center mb-2 border-b-2 border-black pb-2 flex items-center justify-center min-h-[80px]">
+        <div className="absolute left-0 top-0">
+          <img src={depedSeal} alt="DepEd Seal" className="w-16 h-16 object-contain" />
+        </div>
+        <div>
+          <p className="text-[9px]">Republic of the Philippines</p>
+          <p className="text-[9px]">Department of Education</p>
+          <p className="text-[13px] font-black uppercase mt-1">
+            Learner's Permanent Academic Record for Junior High School (SF10-JHS)
+          </p>
+          <p className="text-[9px]">(Formerly Form 137)</p>
+        </div>
+        <div className="absolute right-0 top-0">
+          <img src={depedWordmark} alt="DepEd Wordmark" className="w-24 h-16 object-contain" />
+        </div>
       </div>
 
       {/* ── Learner Information ── */}
@@ -362,7 +242,7 @@ export function SF10FrontPage({ student, subjects }: { student: any; subjects: S
             </span>
             <span>
               NAME EXTN. (Jr, I, II):{" "}
-              <span className="border-b border-black inline-block w-12"></span>
+              <span className="border-b border-black inline-block w-12">{student.nameExtension || ""}</span>
             </span>
             <span>
               MIDDLE NAME:{" "}
@@ -376,11 +256,11 @@ export function SF10FrontPage({ student, subjects }: { student: any; subjects: S
             </span>
             <span>
               Birthdate (mm/dd/yyyy):{" "}
-              <span className="font-semibold border-b border-black inline-block min-w-[80px] px-1">03/15/2010</span>
+              <span className="font-semibold border-b border-black inline-block min-w-[80px] px-1"></span>
             </span>
             <span>
               Sex:{" "}
-              <span className="font-semibold border-b border-black inline-block min-w-[40px] px-1">Male</span>
+              <span className="font-semibold border-b border-black inline-block min-w-[40px] px-1"></span>
             </span>
           </div>
         </div>
@@ -396,17 +276,17 @@ export function SF10FrontPage({ student, subjects }: { student: any; subjects: S
             <span className="font-semibold">☑ Elementary School Completer</span>
             <span>
               General Average:{" "}
-              <span className="font-semibold border-b border-black inline-block min-w-[40px] px-1">92.50</span>
+              <span className="font-semibold border-b border-black inline-block min-w-[40px] px-1"></span>
             </span>
             <span>
               Citation (If Any):{" "}
-              <span className="font-semibold border-b border-black inline-block min-w-[80px] px-1">With High Honors</span>
+              <span className="font-semibold border-b border-black inline-block min-w-[80px] px-1"></span>
             </span>
           </div>
           <div className="flex gap-4 items-baseline mb-1">
             <span>
               Name of Elementary School:{" "}
-              <span className="font-semibold border-b border-black inline-block min-w-[120px] px-1">QC Elementary School</span>
+              <span className="font-semibold border-b border-black inline-block min-w-[120px] px-1"></span>
             </span>
             <span>
               School ID:{" "}
@@ -439,8 +319,8 @@ export function SF10FrontPage({ student, subjects }: { student: any; subjects: S
           <span className="font-bold text-[9px] uppercase tracking-wide">Scholastic Record</span>
         </div>
         <div className="px-2 py-1">
-          <ScholasticBlock record={grade8Record} />
-          <ScholasticBlock record={grade7Record} />
+          <ScholasticBlock record={grade7Record} subjects={subjects} />
+          <ScholasticBlock record={grade8Record} subjects={subjects} />
         </div>
       </div>
 
@@ -474,36 +354,24 @@ export function SF10FrontPage({ student, subjects }: { student: any; subjects: S
 
 // ─── Back Page ─────────────────────────────────────────────────────────────────
 
-export function SF10BackPage({ student }: { student: any }) {
-  const grade9Record: ScholasticRecord = {
-    school:     "DepEd JHS Model School",
-    schoolId:   "301028",
-    district:   "Quezon City District IV",
-    division:   "Quezon City",
-    region:     "NCR",
-    gradeLevel: 9,
-    section:    "Mabini",
-    schoolYear: "2026–2027",
-    adviser:    "",
-    grades:     {},
-  };
+export function SF10BackPage({ student, subjects, records }: { student: any; subjects: Subject[]; records: ScholasticRecord[] }) {
+  const emptyRecord = (gl: number): ScholasticRecord => ({
+    school: "", schoolId: "", district: "", division: "", region: "",
+    gradeLevel: gl, section: "", schoolYear: "", adviser: "", grades: {}
+  });
 
-  const grade10Record: ScholasticRecord = {
-    ...grade9Record,
-    gradeLevel: 10,
-    section:    "Luna",
-    schoolYear: "2027–2028",
-  };
+  const grade9Record = records.find(r => r.gradeLevel === 9) || emptyRecord(9);
+  const grade10Record = records.find(r => r.gradeLevel === 10) || emptyRecord(10);
 
   const summaryRecords = [grade9Record, grade10Record];
 
   return (
     <div
-      className="bg-white text-black font-sans"
-      style={{ width: "816px", padding: "28px 32px", fontSize: "10px" }}
+      className="bg-white text-black"
+      style={{ width: "816px", padding: "28px 32px", fontSize: "10px", fontFamily: CALIBRI }}
     >
       {/* ── Header ── */}
-      <div className="flex justify-between items-center border-b-2 border-black pb-2 mb-3">
+      <div className="flex justify-between items-center border-b-2 border-black pb-2 mb-3" style={{ fontFamily: CALIBRI }}>
         <div>
           <p className="font-black text-[11px] uppercase">SF 10-JHS</p>
           <p className="text-[9px] font-semibold">{student.name} · LRN: {student.lrn}</p>
@@ -520,7 +388,7 @@ export function SF10BackPage({ student }: { student: any }) {
             <span className="font-bold text-[9px] uppercase">Grade {record.gradeLevel} Scholastic Record</span>
           </div>
           <div className="px-2 py-1">
-            <ScholasticBlock record={record} />
+            <ScholasticBlock record={record} subjects={subjects} />
           </div>
         </div>
       ))}
@@ -532,7 +400,7 @@ export function SF10BackPage({ student }: { student: any }) {
             Summary of Learner's Achievement
           </span>
         </div>
-        <table className="w-full text-[9px]" style={{ borderCollapse: "collapse" }}>
+        <table className="w-full text-[9px]" style={{ borderCollapse: "collapse", fontFamily: CALIBRI }}>
           <thead>
             <tr>
               <th className={`${TH} text-left`}>Grade Level</th>
@@ -542,20 +410,34 @@ export function SF10BackPage({ student }: { student: any }) {
             </tr>
           </thead>
           <tbody>
-            {[7, 8, 9, 10].map((gl) => (
-              <tr key={gl}>
-                <td className={`${TDL} h-5`}>Grade {gl}</td>
-                <td className={TD}></td>
-                <td className={TD}></td>
-                <td className={TD}></td>
-              </tr>
-            ))}
+            {[7, 8, 9, 10].map((gl) => {
+              const r = records.find(x => x.gradeLevel === gl);
+              let avg = r?.generalAvg ? Number(r.generalAvg) : null;
+              if (r && (avg == null || isNaN(avg))) {
+                 const sortedSubjs = [...(subjects || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+                 const finals = sortedSubjs.map(s => {
+                    const name = s.displayName || s.name;
+                    return calcFinal(r.grades[name] || r.grades[s.name]);
+                 }).filter((v): v is number => v != null);
+                 if (finals.length > 0) {
+                    avg = Math.round((finals.reduce((a, b) => a + b, 0) / finals.length) * 100) / 100;
+                 }
+              }
+              return (
+                <tr key={gl}>
+                  <td className={`${TDL} h-5`}>Grade {gl}</td>
+                  <td className={TD}>{r?.schoolYear || ""}</td>
+                  <td className={TD}>{avg?.toFixed(2) || ""}</td>
+                  <td className={TD}>{avg != null ? getRemarks(avg >= 75 ? 75 : 74) : ""}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       {/* ── Certification ── */}
-      <div className="text-[9px] mt-4">
+      <div className="text-[9px] mt-4" style={{ fontFamily: CALIBRI }}>
         <p>
           I certify that this is a true and accurate record of{" "}
           <span className="font-semibold">{student.name}</span>.
@@ -579,24 +461,102 @@ export function SF10BackPage({ student }: { student: any }) {
 
 // ─── Full Preview with Export Button ──────────────────────────────────────────
 
+// ─── Compile API data into records ─────────────────────────────────────────────
+
+export function compileSF10Records(apiData: any): ScholasticRecord[] {
+  if (!apiData) return [];
+  const { history = [], records = [] } = apiData;
+
+  const results: Record<number, ScholasticRecord> = {};
+
+  // Process history (prior records)
+  for (const h of history) {
+    if (!results[h.grade_level]) {
+      results[h.grade_level] = {
+        school: h.school_name || "",
+        schoolId: h.school_id || "",
+        district: h.district || "",
+        division: h.division || "",
+        region: h.region || "",
+        gradeLevel: h.grade_level,
+        section: h.section_name || "",
+        schoolYear: h.school_year || "",
+        adviser: h.adviser_name || "",
+        generalAvg: h.general_average,
+        grades: {}
+      };
+    }
+    if (h.subject_name) {
+      results[h.grade_level].grades[h.subject_name] = {
+        q1: h.q1_grade,
+        q2: h.q2_grade,
+        q3: h.q3_grade,
+        q4: h.q4_grade,
+        final: h.final_rating,
+        remarks: h.subject_remarks
+      };
+    }
+  }
+
+  // Process records (current enrollments) - overrides history if same grade level
+  for (const r of records) {
+    if (!results[r.grade_level]) {
+      results[r.grade_level] = {
+        school: "Berkeley Student Information System", // default
+        schoolId: "Berkeley", // default
+        district: "", division: "", region: "",
+        gradeLevel: r.grade_level,
+        section: r.section_name || "",
+        schoolYear: r.school_year || "",
+        adviser: "",
+        generalAvg: r.general_average,
+        grades: {}
+      };
+    }
+    // Update basic info if missing
+    results[r.grade_level].section = r.section_name || results[r.grade_level].section;
+    results[r.grade_level].schoolYear = r.school_year || results[r.grade_level].schoolYear;
+
+    if (r.subject_name) {
+      // Overwrite grade for this subject
+      results[r.grade_level].grades[r.subject_name] = {
+        q1: r.q1_grade,
+        q2: r.q2_grade,
+        q3: r.q3_grade,
+        q4: r.q4_grade,
+        final: r.final_grade,
+        remarks: r.subject_remarks
+      };
+    }
+  }
+
+  return Object.values(results).sort((a, b) => a.gradeLevel - b.gradeLevel);
+}
+
+// ─── Full Preview with Export Button ──────────────────────────────────────────
+
+import { getSF10Data } from "@/services/api";
+
 export function SF10Preview() {
   const { studentId } = useParams<{ studentId: string }>();
   const [student, setStudent] = useState<Student | null>(null);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [records, setRecords] = useState<ScholasticRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!studentId) return;
     async function load() {
       setLoading(true);
       try {
-        const [det, subjs] = await Promise.all([
+        const [det, subjs, sf10] = await Promise.all([
           getStudentDetails(Number(studentId)),
-          getSubjects()
+          getSubjects(),
+          getSF10Data(Number(studentId))
         ]);
         setStudent(det);
         setSubjects(subjs);
+        setRecords(compileSF10Records(sf10));
       } catch (err) {
         console.error(err);
       } finally {
@@ -605,12 +565,6 @@ export function SF10Preview() {
     }
     load();
   }, [studentId]);
-
-  const handleExport = async () => {
-    if (!student) return;
-    const nameStr = `${student.lastName}_${student.firstName}`.replace(/[^a-zA-Z]/g, "_");
-    await exportToPDF("sf10-print-area", `SF10_${student.lrn}_${nameStr}.pdf`);
-  };
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -622,69 +576,75 @@ export function SF10Preview() {
 
   const stuGrade: any = {
     name: `${student.lastName}, ${student.firstName}`,
-    lrn: student.lrn
+    lrn: student.lrn,
+    middleName: student.middleName
   };
 
   return (
-    <div className="flex flex-col items-center gap-4 py-6 bg-slate-100 min-h-screen">
-      {/* Export Button */}
-      <div className="flex gap-3 items-center mb-2">
-        <h2 className="text-lg font-bold text-slate-700">SF10 Preview</h2>
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 active:bg-blue-900
-                     text-white font-semibold text-sm px-4 py-2 rounded-lg shadow
-                     transition-colors duration-150"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none"
-               viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
-          </svg>
-          Export to PDF
-        </button>
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-2 bg-slate-600 hover:bg-slate-700 active:bg-slate-800
-                     text-white font-semibold text-sm px-4 py-2 rounded-lg shadow
-                     transition-colors duration-150"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none"
-               viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012
-                     2v5a2 2 0 01-2 2h-2m-2 0H8v4h8v-4z"/>
-          </svg>
-          Print
-        </button>
-      </div>
-
-      {/* Print Area */}
-      <div
-        id="sf10-print-area"
-        ref={printRef}
-        className="flex flex-col gap-6 print:gap-0"
-      >
-        {/* Page 1 – Front */}
-        <div className="shadow-md print:shadow-none">
-          <SF10FrontPage student={stuGrade} subjects={subjects} />
-        </div>
-
-        {/* Page 2 – Back */}
-        <div className="shadow-md print:shadow-none print:break-before-page">
-          <SF10BackPage student={stuGrade} />
-        </div>
-      </div>
-
-      {/* Print styles */}
+    <>
+      {/* ── Print / PDF styles injected into <head> ── */}
       <style>{`
         @media print {
-          body > * { display: none !important; }
-          #sf10-print-area { display: block !important; }
-          #sf10-print-area > div { page-break-after: always; }
+          @page {
+            size: 8.5in 13in portrait;
+            margin: 0;
+          }
+
+          /* Hide the entire app shell — nav, header, sidebars etc */
+          body { margin: 0 !important; }
+          #root > *:not(#sf10-root) { display: none !important; }
+          #sf10-root {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            padding: 0 !important;
+            gap: 0 !important;
+            min-height: unset !important;
+            background: none !important;
+          }
+          .sf10-toolbar { display: none !important; }
+          .sf10-page-shadow { box-shadow: none !important; }
+          .sf10-page-break { break-before: page !important; }
         }
       `}</style>
-    </div>
+
+      <div id="sf10-root" className="sf10-screen-wrapper flex flex-col items-center gap-6 py-8 bg-slate-100 min-h-screen">
+        {/* ── Toolbar (hidden on print) ── */}
+        <div className="sf10-toolbar flex items-center gap-3 print:hidden">
+          <h2 className="text-lg font-bold text-slate-700 mr-2">SF10-JHS Preview</h2>
+
+          {/* Print button */}
+          <button
+            onClick={triggerPrint}
+            className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 active:bg-blue-900
+                       text-white font-semibold text-sm px-4 py-2 rounded-lg shadow
+                       transition-colors duration-150"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round"
+                    d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012
+                       2v5a2 2 0 01-2 2h-2m-2 0H8v4h8v-4z"/>
+            </svg>
+            Print / Save as PDF
+          </button>
+
+          <p className="text-xs text-slate-400 ml-1">
+            Tip: In the print dialog, select <strong>"Save as PDF"</strong> and set paper size to <strong>Legal</strong>.
+          </p>
+        </div>
+
+        {/* ── Page 1 — Front ── */}
+        <div className="sf10-page-shadow shadow-xl">
+          <SF10FrontPage student={stuGrade} subjects={subjects} records={records} />
+        </div>
+
+        {/* ── Page 2 — Back ── */}
+        <div className="sf10-page-shadow sf10-page-break shadow-xl">
+          <SF10BackPage student={stuGrade} subjects={subjects} records={records} />
+        </div>
+      </div>
+    </>
   );
 }
 

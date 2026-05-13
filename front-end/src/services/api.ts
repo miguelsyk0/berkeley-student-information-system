@@ -248,8 +248,45 @@ export interface AcademicRecord {
   q3Grade?: number;
   q4Grade?: number;
   finalGrade?: number;
+  q1Average?: number;
+  q1Letter?: string;
+  q2Average?: number;
+  q2Letter?: string;
+  q3Average?: number;
+  q3Letter?: string;
+  q4Average?: number;
+  q4Letter?: string;
   finalLetterGrade?: string;
   subjectRemarks?: string;
+}
+export async function getStudentStats(): Promise<{ total_students: number, incomplete_students: number, g10_missing_transcripts: number }> {
+  const res = await authFetch(`${BASE_URL}/students/stats`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getIncompleteStudents(): Promise<any[]> {
+  const res = await authFetch(`${BASE_URL}/students/incomplete`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function bulkCreateStudents(
+  students: any[],
+  enrollmentInfo?: { schoolYearId?: number; sectionId?: number; gradeLevel?: number }
+): Promise<{ success_count: number, errors: any[] }> {
+  const res = await authFetch(`${BASE_URL}/students/bulk`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ 
+      students, 
+      schoolYearId: enrollmentInfo?.schoolYearId,
+      sectionId: enrollmentInfo?.sectionId,
+      gradeLevel: enrollmentInfo?.gradeLevel
+    }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
 
 export async function getStudents(filters?: {
@@ -302,6 +339,7 @@ export async function deleteStudent(id: number): Promise<{ result: string }> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(await res.text());
+  if (res.status === 204) return { result: "success" };
   return res.json();
 }
 
@@ -312,10 +350,11 @@ export async function enrollStudent(enrollmentData: {
   gradeLevel: number;
   enrollmentDate?: string;
 }): Promise<{ result: string }> {
-  const res = await authFetch(`${BASE_URL}/students/enroll`, {
+  const { studentId, ...rest } = enrollmentData;
+  const res = await authFetch(`${BASE_URL}/students/${studentId}/enroll`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(enrollmentData),
+    body: JSON.stringify(rest),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -343,6 +382,13 @@ export async function addTransfereeTranscript(studentId: number, transcriptData:
   return res.json();
 }
 
+/** Returns the full SF10/transcript history for a student with per-subject rows. */
+export async function getStudentTranscriptHistory(studentId: number): Promise<any[]> {
+  const res = await authFetch(`${BASE_URL}/students/${studentId}/sf10`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 // ── Subject Management ─────────────────────────────────────────────────────
 
 export interface Subject {
@@ -350,12 +396,10 @@ export interface Subject {
   code: string;
   name: string;
   displayName?: string;
-  gradeLevel?: number;
-  isMapeh?: boolean;
-  mapehComponent?: string;
-  mapehParentId?: number;
+  gradeLevel: number;
+  cluster?: "Logical Analysis" | "Social Literacy" | "Wika at Pagpapakatao" | "Psychomotor" | null;
   description?: string;
-  sortOrder?: number;
+  order?: number;
   isActive?: boolean;
 }
 
@@ -365,12 +409,7 @@ export async function getSubjects(): Promise<Subject[]> {
   return res.json();
 }
 
-export async function createSubject(data: {
-  name: string;
-  code: string;
-  gradeLevel: number;
-  description?: string;
-}): Promise<{ result: string }> {
+export async function createSubject(data: Omit<Subject, "id" | "order">): Promise<{ result: string }> {
   const res = await authFetch(`${BASE_URL}/subjects`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -380,12 +419,7 @@ export async function createSubject(data: {
   return res.json();
 }
 
-export async function updateSubject(id: number, data: {
-  name: string;
-  code: string;
-  gradeLevel: number;
-  description?: string;
-}): Promise<{ result: string }> {
+export async function updateSubject(id: number, data: Omit<Subject, "id" | "order">): Promise<{ result: string }> {
   const res = await authFetch(`${BASE_URL}/subjects/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -468,6 +502,20 @@ export async function getStudentGrades(studentId: number): Promise<Array<{
   q4Grade?: number;
   finalGrade?: number;
   remarks?: string;
+  // Metadata fields from enrollment
+  gradeLevel?: number;
+  section?: string;
+  schoolYear?: string;
+  generalAverage?: number;
+  finalLetterGrade?: string;
+  q1Average?: number;
+  q1Letter?: string;
+  q2Average?: number;
+  q2Letter?: string;
+  q3Average?: number;
+  q3Letter?: string;
+  q4Average?: number;
+  q4Letter?: string;
 }>> {
   const res = await authFetch(`${BASE_URL}/grades/student/${studentId}`);
   if (!res.ok) throw new Error(await res.text());
@@ -479,6 +527,18 @@ export async function getGeneralAverage(section: string, quarter?: string): Prom
   if (quarter) params.append("quarter", quarter);
 
   const res = await authFetch(`${BASE_URL}/grades/general-average?${params}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getEncodingProgress(schoolYearId: number, quarter: number): Promise<Array<{
+  id: number;
+  name: string;
+  gradeLevel: number;
+  total: number;
+  encoded: number;
+}>> {
+  const res = await authFetch(`${BASE_URL}/grades/encoding-progress?schoolYearId=${schoolYearId}&quarter=${quarter}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -509,15 +569,61 @@ export async function getStudentSF10History(studentId: number): Promise<any[]> {
   return res.json();
 }
 
-export async function startImport(data: {
-  fileUrl: string;
+export async function analyzeImport(data: { 
+  sourceMethod: "local" | "url" | "drive"; 
+  file?: File; 
+  url?: string;
+  headerRow?: number;
+  sheetName?: string;
+}): Promise<{
+  headers: string[];
+  sampleRows: any[];
+  totalRows: number;
+  sheetNames: string[];
+  currentSheet: string;
+  rawData: any[];
+}> {
+  const formData = new FormData();
+  formData.append("sourceMethod", data.sourceMethod);
+  if (data.file) formData.append("file", data.file);
+  if (data.url) formData.append("url", data.url);
+  if (data.headerRow) formData.append("headerRow", data.headerRow.toString());
+  if (data.sheetName) formData.append("sheetName", data.sheetName);
+
+  const res = await authFetch(`${BASE_URL}/imports/analyze`, {
+    method: "POST",
+    body: formData, // authFetch should handle FormData properly
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function validateImport(data: {
+  rows: any[];
+  mapping: Record<string, string>;
+  section: string;
+  gradeLevel: number;
+}): Promise<any[]> {
+  const res = await authFetch(`${BASE_URL}/imports/validate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function confirmImport(data: {
+  rows: any[];
+  mapping: Record<string, string>;
   section: string;
   gradeLevel: number;
   schoolYear: string;
   quarter: number;
-  columnMappings: Array<{ sourceColumn: string; targetField: string }>;
-}): Promise<{ result: string }> {
-  const res = await authFetch(`${BASE_URL}/imports`, {
+  skipErrors: boolean;
+  overwrite: boolean;
+}): Promise<{ message: string; successCount: number; skipCount: number }> {
+  const res = await authFetch(`${BASE_URL}/imports/confirm`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -544,20 +650,20 @@ export async function getImportDetails(logId: number): Promise<ImportLog> {
   return res.json();
 }
 
-export async function confirmImport(logId: number, skipErrors?: boolean): Promise<{ result: string }> {
-  const res = await authFetch(`${BASE_URL}/imports/${logId}/confirm`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ skipErrors }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
 // ── SF10 Management ────────────────────────────────────────────────────────
 
 export async function getSF10Data(studentId: number): Promise<any> {
   const res = await authFetch(`${BASE_URL}/sf10/${studentId}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function saveStudentTranscript(studentId: number, records: any[]): Promise<{ result: string }> {
+  const res = await authFetch(`${BASE_URL}/students/${studentId}/transcript`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ records }),
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -576,4 +682,12 @@ export async function exportSF10PDF(studentId: number): Promise<Blob> {
   const res = await authFetch(`${BASE_URL}/sf10/${studentId}/export`);
   if (!res.ok) throw new Error(await res.text());
   return res.blob();
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────
+
+export async function getDashboardSummary(schoolYearId: number, quarter: number): Promise<any> {
+  const res = await authFetch(`${BASE_URL}/dashboard/summary?schoolYearId=${schoolYearId}&quarter=${quarter}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Search, ChevronRight, Users,
-  GraduationCap, Pencil, Trash2, BookOpen, MoreHorizontal,
+  Search, Users,
+  GraduationCap, Pencil, Trash2, BookOpen, MoreHorizontal, AlertTriangle, FileWarning, CheckCircle2
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useHeader } from "@/contexts/HeaderContext";
-import React from "react";
+import { useSetHeader } from "@/contexts/HeaderContext";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -24,8 +23,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { GRADE_COLORS, STATUS_STYLES } from "@/utils/gradeUtils";
+import { StatCard } from "@/components/ui/StatCard";
 import { getAge, formatDate } from "@/utils/dateUtils";
-import { getStudents, getSections, getSchoolYears, deleteStudent as deleteStudentApi } from "@/services/api";
+import { getStudents, getSections, getSchoolYears, deleteStudent as deleteStudentApi, getStudentStats, getIncompleteStudents } from "@/services/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ROUTES } from "@/routes";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -79,7 +80,7 @@ function StudentRow({
   onDelete,
 }: {
   student: StudentWithEnrollment;
-  onDelete: (id: number) => void;
+  onDelete: (student: StudentWithEnrollment) => void;
 }) {
   const navigate = useNavigate();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -163,7 +164,7 @@ function StudentRow({
                 <Pencil className="w-3.5 h-3.5 mr-2" /> Edit Info
               </DropdownMenuItem>
               {!isEnrolled && (
-                <DropdownMenuItem onClick={() => navigate(ROUTES.students.enroll, { state: { student } })}>
+                <DropdownMenuItem onClick={() => navigate(ROUTES.students.enroll)}>
                   <GraduationCap className="w-3.5 h-3.5 mr-2" /> Enroll Student
                 </DropdownMenuItem>
               )}
@@ -190,7 +191,7 @@ function StudentRow({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => onDelete(student.id)}>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => onDelete(student)}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -214,6 +215,11 @@ export default function StudentList() {
 
   const [students, setStudents] = useState<StudentWithEnrollment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ total_students: 0, incomplete_students: 0, g10_missing_transcripts: 0 });
+  const [incompleteStudents, setIncompleteStudents] = useState<any[]>([]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [deletedStudentName, setDeletedStudentName] = useState("");
 
   // Load basic data
   const [sections, setSections] = useState<any[]>([]);
@@ -222,8 +228,14 @@ export default function StudentList() {
   useEffect(() => {
     async function loadResources() {
       try {
-        const [yearData] = await Promise.all([getSchoolYears()]);
+        const [yearData, statsData, incompleteData] = await Promise.all([
+          getSchoolYears(),
+          getStudentStats(),
+          getIncompleteStudents()
+        ]);
         setYears(yearData);
+        setStats(statsData);
+        setIncompleteStudents(incompleteData);
         const activeYear = yearData.find(y => y.isActive) || yearData[0];
         if (activeYear) {
           setFilters(f => ({ ...f, year: activeYear.label }));
@@ -275,10 +287,12 @@ export default function StudentList() {
     fetchStudents();
   }, [filters]);
 
-  async function handleDelete(id: number) {
+  async function handleDelete(student: StudentWithEnrollment) {
     try {
-      await deleteStudentApi(id);
-      setStudents(prev => prev.filter(s => s.id !== id));
+      await deleteStudentApi(student.id);
+      setStudents(prev => prev.filter(s => s.id !== student.id));
+      setDeletedStudentName(`${student.firstName} ${student.lastName}`);
+      setSuccessModalOpen(true);
     } catch (err) {
       console.error(err);
     }
@@ -287,24 +301,65 @@ export default function StudentList() {
   const enrolledCount = students.filter(s => !!s.enrollmentId).length;
   const unenrolledCount = students.length - enrolledCount;
 
-  useHeader({
+  useSetHeader({
     breadcrumbs: [
       { label: "Students" },
       { label: "Student List" },
     ],
     actions: (
-      <Button
-        size="sm"
-        className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
-        onClick={() => navigate(ROUTES.students.enroll)}
-      >
-        <GraduationCap className="w-3.5 h-3.5" /> Enroll Student
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 text-xs gap-1.5"
+          onClick={() => navigate(ROUTES.students.add)}
+        >
+          <GraduationCap className="w-3.5 h-3.5" /> Add Student
+        </Button>
+        <Button
+          size="sm"
+          className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
+          onClick={() => navigate(ROUTES.students.enroll)}
+        >
+          <GraduationCap className="w-3.5 h-3.5" /> Enroll Student
+        </Button>
+      </div>
     )
   });
 
   return (
     <div className="p-6 space-y-4">
+        {/* Dashboard Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <StatCard
+            label="Total Students"
+            value={stats.total_students}
+            icon={Users}
+            iconColor="text-teal-600"
+            iconBg="bg-teal-50"
+          />
+          
+          <StatCard
+            label="Incomplete Records"
+            value={stats.incomplete_students}
+            icon={AlertTriangle}
+            iconColor="text-amber-600"
+            iconBg="bg-amber-100"
+            className="border border-amber-200 bg-amber-50"
+            onClick={() => { if(stats.incomplete_students > 0) setIsDialogOpen(true); }}
+          />
+
+          <StatCard
+            label="Missing G10 Transcripts"
+            value={stats.g10_missing_transcripts}
+            icon={FileWarning}
+            iconColor="text-rose-600"
+            iconBg="bg-rose-100"
+            className="border border-rose-200 bg-rose-50"
+            onClick={() => { if(stats.g10_missing_transcripts > 0) setIsDialogOpen(true); }}
+          />
+        </div>
+
         {/* Title + summary */}
         <div className="flex items-end justify-between">
           <div>
@@ -418,6 +473,76 @@ export default function StudentList() {
             </table>
           )}
         </Card>
+
+        {/* Incomplete Records Dialog */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col p-0 gap-0 border-0 rounded-2xl shadow-2xl">
+            <DialogHeader className="px-6 py-4 border-b border-slate-100 bg-white">
+              <DialogTitle className="text-lg font-black text-slate-800 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" /> Students with Incomplete Records
+              </DialogTitle>
+            </DialogHeader>
+            <div className="overflow-y-auto bg-slate-50 p-6 flex-1">
+              <div className="grid gap-3">
+                {incompleteStudents.map(student => (
+                  <Card key={student.id} 
+                    className="border border-slate-200 shadow-sm hover:border-slate-300 transition-colors cursor-pointer"
+                    onClick={() => navigate(ROUTES.students.edit(student.id))}
+                  >
+                    <div className="px-5 py-4 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <Avatar className="w-10 h-10">
+                          <AvatarFallback className="bg-amber-100 text-amber-700 font-black">
+                            {student.first_name?.[0]}{student.last_name?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-bold text-slate-800">{student.last_name}, {student.first_name}</p>
+                          <p className="text-xs text-slate-500 font-mono">{student.lrn}</p>
+                        </div>
+                      </div>
+                      <div className="text-right flex flex-col items-end gap-1.5">
+                        {student.is_g10_missing_transcript ? (
+                           <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-100 border-0 text-[10px] font-bold">
+                             Missing G7-G9 Transcripts
+                           </Badge>
+                        ) : (
+                           <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 text-[10px] font-bold">
+                             Basic Info Incomplete
+                           </Badge>
+                        )}
+                        <p className="text-[11px] font-semibold text-slate-400">Missing: {student.missing_fields}</p>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-end">
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Close</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Success Delete Modal */}
+        <AlertDialog open={successModalOpen} onOpenChange={setSuccessModalOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-emerald-600 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5" /> Student Deleted
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {deletedStudentName} has been successfully deleted from the system.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setSuccessModalOpen(false)}>
+                Okay
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
       </div>
   );
 }

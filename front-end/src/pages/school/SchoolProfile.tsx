@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { Building2, MapPin, Globe, Pencil, Save, X, ChevronRight } from "lucide-react";
+import { Building2, MapPin, Globe, Pencil, Save, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
 import { getSchoolProfile, updateSchoolProfile, type School } from "@/services/api";
-import { useHeader } from "@/contexts/HeaderContext";
+import { useSetHeader } from "@/contexts/HeaderContext";
 import React from "react";
 
 // ── Field Row ──────────────────────────────────────────────────────────────────
@@ -55,6 +55,34 @@ export default function SchoolProfile() {
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // ── useHeader MUST be called unconditionally (Rules of Hooks) ──────────────
+  useSetHeader({
+    title: "School Profile",
+    subtitle: "Manage your school's official information used across the system and in SF10 documents.",
+    breadcrumbs: [
+      { label: "School & Sections" },
+      { label: "School Profile" },
+    ],
+    actions: (
+      <div className="flex gap-2">
+        {editing ? (
+          <>
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={handleCancel} disabled={saving}>
+              <X className="w-3.5 h-3.5" /> Cancel
+            </Button>
+            <Button size="sm" className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800" onClick={handleSave} disabled={saving}>
+              <Save className="w-3.5 h-3.5" /> {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </>
+        ) : (
+          <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => setEditing(true)}>
+            <Pencil className="w-3.5 h-3.5" /> Edit Profile
+          </Button>
+        )}
+      </div>
+    )
+  });
 
   useEffect(() => {
     loadSchoolProfile();
@@ -119,38 +147,8 @@ export default function SchoolProfile() {
     );
   }
 
-  useHeader({
-    breadcrumbs: [
-      { label: "School & Sections" },
-      { label: "School Profile" },
-    ],
-    actions: (
-      <div className="flex gap-2">
-        {editing ? (
-          <>
-            <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={handleCancel} disabled={saving}>
-              <X className="w-3.5 h-3.5" /> Cancel
-            </Button>
-            <Button size="sm" className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800" onClick={handleSave} disabled={saving}>
-              <Save className="w-3.5 h-3.5" /> {saving ? "Saving..." : "Save Changes"}
-            </Button>
-          </>
-        ) : (
-          <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => setEditing(true)}>
-            <Pencil className="w-3.5 h-3.5" /> Edit Profile
-          </Button>
-        )}
-      </div>
-    )
-  });
-
   return (
     <div className="p-6 max-w-3xl">
-        {/* Page Title */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-black text-slate-800">School Profile</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Manage your school's official information used across the system and in SF10 documents.</p>
-        </div>
 
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-0 pt-5 px-6">

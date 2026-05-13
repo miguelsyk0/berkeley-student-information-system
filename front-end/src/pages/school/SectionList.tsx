@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  Users, Plus, Pencil, Trash2, ChevronRight,
+  Users, Plus, Pencil, Trash2,
   Search, UserCheck, BookOpen,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,9 +21,7 @@ import {
 
 import SectionForm from "./SectionForm";
 import { getSections, deleteSection, createSection, updateSection, getSchoolYears, getTeachers, assignSectionAdviser } from "@/services/api";
-import { useHeader } from "@/contexts/HeaderContext";
-import React from "react";
-import { ROUTES } from "@/routes";
+import { useSetHeader } from "@/contexts/HeaderContext";
 import type { Section, SchoolYear, Teacher } from "@/services/api";
 
 
@@ -305,7 +303,7 @@ export default function SectionList() {
     }
   }
 
-  useHeader({
+  useSetHeader({
     title: "Sections",
     subtitle: `${filtered.length} section${filtered.length !== 1 ? "s" : ""} · ${filtered.reduce((a, b) => a + (b.enrolledCount || 0), 0)} students total`,
     breadcrumbs: [

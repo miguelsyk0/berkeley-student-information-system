@@ -10,6 +10,7 @@ const subjectsRouter = require("./routes/subjects");
 const importsRouter = require("./routes/imports");
 const gradesRouter = require("./routes/grades");
 const sf10Router = require("./routes/sf10");
+const dashboardRouter = require("./routes/dashboard");
 
 const authMiddleware = require("./authMiddleware");
 
@@ -27,9 +28,10 @@ app.use("/api", authMiddleware);
 
 app.use("/api", schoolRouter);
 app.use("/api", subjectsRouter);
-app.use("/api", importsRouter);
+app.use("/api/imports", importsRouter);
 app.use("/api", gradesRouter);
 app.use("/api", sf10Router);
+app.use("/api", dashboardRouter);
 app.use("/api", studentsRouter);
 
 // Health check endpoint (Public)

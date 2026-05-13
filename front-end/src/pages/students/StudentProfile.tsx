@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ChevronRight, Pencil, GraduationCap, User,
+  Pencil, GraduationCap, User,
   BookOpen, Clock, Award,
   TrendingUp, CheckCircle2, AlertCircle,
 } from "lucide-react";
@@ -12,8 +12,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   GRADE_COLORS, STATUS_STYLES,
 } from "@/utils/gradeUtils";
-import { useHeader } from "@/contexts/HeaderContext";
-import React from "react";
+import { useSetHeader } from "@/contexts/HeaderContext";
 import { getAge, formatDate } from "@/utils/dateUtils";
 import { getStudentDetails, getStudentEnrollments, getStudentAcademicRecords } from "@/services/api";
 import { ROUTES } from "@/routes";
@@ -173,9 +172,51 @@ function EnrollmentHistoryTab({ enrollments }: { studentId?: number; enrollments
 // ── Tab: Academic Record ───────────────────────────────────────────────────────
 
 function AcademicRecordTab({ records }: { studentId?: number; records: AcademicRecord[] }) {
-  const [selectedRecord, setSelectedRecord] = useState<AcademicRecord | null>(records[0] ?? null);
+  // Group subjects by enrollment (year/section)
+  const grouped = (records || []).reduce((acc: any, r) => {
+    if (!acc[r.enrollmentId]) {
+      acc[r.enrollmentId] = {
+        enrollmentId: r.enrollmentId,
+        schoolYear: r.schoolYear,
+        gradeLevel: r.gradeLevel,
+        section: r.section,
+        generalAverage: r.generalAverage,
+        finalLetterGrade: r.finalLetterGrade,
+        q1Average: r.q1Average,
+        q1Letter: r.q1Letter,
+        q2Average: r.q2Average,
+        q2Letter: r.q2Letter,
+        q3Average: r.q3Average,
+        q3Letter: r.q3Letter,
+        q4Average: r.q4Average,
+        q4Letter: r.q4Letter,
+        subjects: []
+      };
+    }
+    if (r.subjectName) {
+      acc[r.enrollmentId].subjects.push({
+        name: r.subjectName,
+        q1: r.q1Grade,
+        q2: r.q2Grade,
+        q3: r.q3Grade,
+        q4: r.q4Grade,
+        final: r.finalGrade,
+        remarks: r.subjectRemarks
+      });
+    }
+    return acc;
+  }, {});
 
-  if (records.length === 0) {
+  const uniqueRecords = Object.values(grouped).sort((a: any, b: any) => a.gradeLevel - b.gradeLevel);
+  const [selectedRecord, setSelectedRecord] = useState<any>(uniqueRecords[0] ?? null);
+
+  useEffect(() => {
+    if (!selectedRecord && uniqueRecords.length > 0) {
+      setSelectedRecord(uniqueRecords[0]);
+    }
+  }, [uniqueRecords, selectedRecord]);
+
+  if (uniqueRecords.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
         <TrendingUp className="w-10 h-10 mb-3 opacity-20" />
@@ -196,9 +237,9 @@ function AcademicRecordTab({ records }: { studentId?: number; records: AcademicR
   return (
     <div className="space-y-4">
       {/* School year tabs */}
-      {records.length > 1 && (
+      {uniqueRecords.length > 1 && (
         <div className="flex gap-2">
-          {records.map((r) => (
+          {uniqueRecords.map((r: any) => (
             <button
               key={r.enrollmentId}
               onClick={() => setSelectedRecord(r)}
@@ -228,7 +269,7 @@ function AcademicRecordTab({ records }: { studentId?: number; records: AcademicR
                 <div className="text-right">
                   <p className="text-[10px] text-slate-400 uppercase tracking-widest">General Average</p>
                   <p className={`text-lg font-black ${gradeColor(selectedRecord.generalAverage)}`}>
-                    {selectedRecord.generalAverage.toFixed(2)}
+                    {Number(selectedRecord.generalAverage).toFixed(2)}
                   </p>
                 </div>
               )}
@@ -250,40 +291,66 @@ function AcademicRecordTab({ records }: { studentId?: number; records: AcademicR
                 <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Q3</th>
                 <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Q4</th>
                 <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Final</th>
-                <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Grade</th>
                 <th className="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Remarks</th>
               </tr>
             </thead>
             <tbody>
-              {selectedRecord.subjectName ? (
-                <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+              {selectedRecord.subjects.map((s: any) => (
+                <tr key={s.name} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                   <td className="px-5 py-3">
-                    <p className="text-xs font-semibold text-slate-700">{selectedRecord.subjectName}</p>
+                    <p className="text-xs font-semibold text-slate-700">{s.name}</p>
                   </td>
-                  {[selectedRecord.q1Grade, selectedRecord.q2Grade, selectedRecord.q3Grade, selectedRecord.q4Grade].map((q, i) => (
+                  {[s.q1, s.q2, s.q3, s.q4].map((q, i) => (
                     <td key={i} className={`px-4 py-3 text-center text-xs ${gradeColor(q)}`}>
                       {q ?? "—"}
                     </td>
                   ))}
-                  <td className={`px-4 py-3 text-center text-sm ${gradeColor(selectedRecord.finalGrade)}`}>
-                    {selectedRecord.finalGrade?.toFixed(2) ?? "—"}
+                  <td className={`px-4 py-3 text-center text-sm ${gradeColor(s.final)}`}>
+                    {s.final ? Number(s.final).toFixed(2) : "—"}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    —
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {selectedRecord.subjectRemarks === "Passed" ? (
+                    {s.remarks === "Passed" ? (
                       <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                    ) : selectedRecord.subjectRemarks === "Failed" ? (
+                    ) : s.remarks === "Failed" ? (
                       <AlertCircle className="w-4 h-4 text-red-400 mx-auto" />
                     ) : (
-                      <span className="text-[11px] text-slate-400">{selectedRecord.subjectRemarks ?? "—"}</span>
+                      <span className="text-[11px] text-slate-400">{s.remarks ?? "—"}</span>
                     )}
                   </td>
                 </tr>
-              ) : (
-                <tr><td colSpan={8} className="text-center py-4 text-xs text-slate-400">No grades detailed.</td></tr>
-              )}
+              ))}
+
+              {/* Quarterly Average Row */}
+              <tr className="bg-slate-50/50 border-t-2 border-slate-100">
+                <td className="px-5 py-3 text-xs font-black text-slate-500 uppercase tracking-tight">Quarterly Average</td>
+                <td className={`px-4 py-3 text-center text-sm font-black ${gradeColor(selectedRecord.q1Average)}`}>
+                  {selectedRecord.q1Average ? Number(selectedRecord.q1Average).toFixed(2) : "—"}
+                </td>
+                <td className={`px-4 py-3 text-center text-sm font-black ${gradeColor(selectedRecord.q2Average)}`}>
+                  {selectedRecord.q2Average ? Number(selectedRecord.q2Average).toFixed(2) : "—"}
+                </td>
+                <td className={`px-4 py-3 text-center text-sm font-black ${gradeColor(selectedRecord.q3Average)}`}>
+                  {selectedRecord.q3Average ? Number(selectedRecord.q3Average).toFixed(2) : "—"}
+                </td>
+                <td className={`px-4 py-3 text-center text-sm font-black ${gradeColor(selectedRecord.q4Average)}`}>
+                  {selectedRecord.q4Average ? Number(selectedRecord.q4Average).toFixed(2) : "—"}
+                </td>
+                <td className={`px-4 py-3 text-center text-sm font-black ${gradeColor(selectedRecord.generalAverage)}`}>
+                  {selectedRecord.generalAverage ? Number(selectedRecord.generalAverage).toFixed(2) : "—"}
+                </td>
+                <td className="px-4 py-3"></td>
+              </tr>
+
+              {/* Letter Grade Row */}
+              <tr className="bg-slate-50/50">
+                <td className="px-5 py-2 text-xs font-black text-slate-500 uppercase tracking-tight">Letter Grade</td>
+                <td className="px-4 py-2 text-center text-sm font-black text-teal-600">{selectedRecord.q1Letter ?? "—"}</td>
+                <td className="px-4 py-2 text-center text-sm font-black text-teal-600">{selectedRecord.q2Letter ?? "—"}</td>
+                <td className="px-4 py-2 text-center text-sm font-black text-teal-600">{selectedRecord.q3Letter ?? "—"}</td>
+                <td className="px-4 py-2 text-center text-sm font-black text-teal-600">{selectedRecord.q4Letter ?? "—"}</td>
+                <td className="px-4 py-2 text-center text-sm font-black text-teal-600">{selectedRecord.finalLetterGrade ?? "—"}</td>
+                <td className="px-4 py-2"></td>
+              </tr>
             </tbody>
           </table>
         </Card>
@@ -312,6 +379,37 @@ export default function StudentProfile() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [academicRecords, setAcademicRecords] = useState<AcademicRecord[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const currentEnrollment = enrollments.find(
+    (e) => e.status === "Enrolled"
+  );
+
+  useSetHeader(student ? {
+    breadcrumbs: [
+      { label: "Students", href: ROUTES.students.root },
+      { label: `${student.lastName}, ${student.firstName}` },
+    ],
+    actions: (
+      <div className="flex gap-2">
+        {!currentEnrollment && (
+          <Button
+            size="sm" variant="outline"
+            className="h-8 text-xs gap-1.5"
+            onClick={() => navigate(ROUTES.students.enroll)}
+          >
+            <GraduationCap className="w-3.5 h-3.5" /> Enroll
+          </Button>
+        )}
+        <Button
+          size="sm"
+          className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
+          onClick={() => navigate(ROUTES.students.edit(student.id))}
+        >
+          <Pencil className="w-3.5 h-3.5" /> Edit Info
+        </Button>
+      </div>
+    )
+  } : undefined);
 
   useEffect(() => {
     async function loadData() {
@@ -357,36 +455,7 @@ export default function StudentProfile() {
     );
   }
 
-  const currentEnrollment = enrollments.find(
-    (e) => e.status === "Enrolled"
-  );
 
-  useHeader({
-    breadcrumbs: [
-      { label: "Students", href: ROUTES.students.root },
-      { label: `${student.lastName}, ${student.firstName}` },
-    ],
-    actions: (
-      <div className="flex gap-2">
-        {!currentEnrollment && (
-          <Button
-            size="sm" variant="outline"
-            className="h-8 text-xs gap-1.5"
-            onClick={() => navigate(ROUTES.students.enroll, { state: { student } })}
-          >
-            <GraduationCap className="w-3.5 h-3.5" /> Enroll
-          </Button>
-        )}
-        <Button
-          size="sm"
-          className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
-          onClick={() => navigate(ROUTES.students.edit(student.id), { state: { student } })}
-        >
-          <Pencil className="w-3.5 h-3.5" /> Edit Info
-        </Button>
-      </div>
-    )
-  });
 
   return (
     <div className="p-6 space-y-5">

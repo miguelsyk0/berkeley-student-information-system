@@ -1302,7 +1302,7 @@ ALTER FUNCTION public.create_student(p_lrn character varying, p_fname character 
 -- Name: create_subject(character varying, character varying, smallint, text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.create_subject(p_name character varying, p_code character varying, p_grade_level smallint, p_description text) RETURNS TABLE(result text)
+CREATE FUNCTION public.create_subject(p_name character varying, p_code character varying, p_grade_level smallint, p_description text, p_is_mapeh boolean DEFAULT false, p_mapeh_parent_id integer DEFAULT NULL, p_is_active boolean DEFAULT true, p_display_name character varying DEFAULT NULL) RETURNS TABLE(result text)
     LANGUAGE plpgsql
     AS $$
 DECLARE
@@ -1310,15 +1310,15 @@ DECLARE
 BEGIN
     SELECT COALESCE(MAX(sort_order), 0) INTO v_max_order FROM subjects;
 
-    INSERT INTO subjects (name, code, grade_level, description, sort_order)
-    VALUES (p_name, p_code, p_grade_level, p_description, v_max_order + 1);
+    INSERT INTO subjects (name, code, grade_level, description, is_mapeh, mapeh_parent_id, is_active, display_name, sort_order)
+    VALUES (p_name, p_code, p_grade_level, p_description, p_is_mapeh, p_mapeh_parent_id, p_is_active, p_display_name, v_max_order + 1);
 
     RETURN QUERY SELECT 'Subject created successfully'::TEXT;
 END;
 $$;
 
 
-ALTER FUNCTION public.create_subject(p_name character varying, p_code character varying, p_grade_level smallint, p_description text) OWNER TO postgres;
+ALTER FUNCTION public.create_subject(p_name character varying, p_code character varying, p_grade_level smallint, p_description text, p_is_mapeh boolean, p_mapeh_parent_id integer, p_is_active boolean, p_display_name character varying) OWNER TO postgres;
 
 --
 -- TOC entry 468 (class 1255 OID 17577)
@@ -2825,7 +2825,7 @@ ALTER FUNCTION public.update_student(p_student_id integer, p_student_data jsonb)
 -- Name: update_subject(integer, character varying, character varying, smallint, text); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.update_subject(p_id integer, p_name character varying, p_code character varying, p_grade_level smallint, p_description text) RETURNS TABLE(result text)
+CREATE FUNCTION public.update_subject(p_id integer, p_name character varying, p_code character varying, p_grade_level smallint, p_description text, p_is_mapeh boolean DEFAULT false, p_mapeh_parent_id integer DEFAULT NULL, p_is_active boolean DEFAULT true, p_display_name character varying DEFAULT NULL) RETURNS TABLE(result text)
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -2834,6 +2834,10 @@ BEGIN
         code = p_code,
         grade_level = p_grade_level,
         description = p_description,
+        is_mapeh = p_is_mapeh,
+        mapeh_parent_id = p_mapeh_parent_id,
+        is_active = p_is_active,
+        display_name = p_display_name,
         updated_at = NOW()
     WHERE id = p_id;
 
@@ -2842,7 +2846,7 @@ END;
 $$;
 
 
-ALTER FUNCTION public.update_subject(p_id integer, p_name character varying, p_code character varying, p_grade_level smallint, p_description text) OWNER TO postgres;
+ALTER FUNCTION public.update_subject(p_id integer, p_name character varying, p_code character varying, p_grade_level smallint, p_description text, p_is_mapeh boolean, p_mapeh_parent_id integer, p_is_active boolean, p_display_name character varying) OWNER TO postgres;
 
 --
 -- TOC entry 444 (class 1255 OID 17298)

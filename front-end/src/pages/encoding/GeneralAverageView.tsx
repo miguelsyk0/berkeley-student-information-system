@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/StatCard";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -10,9 +10,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { gradeColor, letterGrade } from "@/utils/gradeUtils";
 import { ROUTES } from "@/routes";
 import { getSchoolYears, getSections, getGeneralAverage, getSubjects } from "@/services/api";
-import { useHeader } from "@/contexts/HeaderContext";
+import { useSetHeader } from "@/contexts/HeaderContext";
 import type { SchoolYear, Section, GeneralAverage, Subject } from "@/services/api";
-import React from "react";
 
 export default function GeneralAverageView() {
   const navigate = useNavigate();
@@ -70,7 +69,7 @@ export default function GeneralAverageView() {
     : 0;
   const passing = averages.filter((s) => s.generalAverage >= 75).length;
 
-  useHeader({
+  useSetHeader({
     breadcrumbs: [
       { label: "Grade Encoding", onClick: () => navigate(ROUTES.grades.root) },
       { label: "General Average" },
@@ -124,20 +123,35 @@ export default function GeneralAverageView() {
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            { label: "Class Average", value: classAvg.toFixed(2), color: "text-teal-700", bg: "bg-teal-50" },
-            { label: "Highest", value: ranked[0]?.avg?.toFixed(2) ?? "—", color: "text-emerald-700", bg: "bg-emerald-50" },
-            { label: "Lowest", value: ranked[ranked.length - 1]?.avg?.toFixed(2) ?? "—", color: "text-red-600", bg: "bg-red-50" },
-            { label: "Passing", value: `${passing}/${ranked.length}`, color: "text-slate-700", bg: "bg-white" },
-          ].map(({ label, value, color, bg }) => (
-            <Card key={label} className={`border-0 shadow-sm ${bg}`}>
-              <CardContent className="px-4 py-3.5 text-center">
-                <p className={`text-2xl font-black ${color}`}>{value}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">{label}</p>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard
+            label="Class Average"
+            value={classAvg.toFixed(2)}
+            iconColor="text-teal-700"
+            iconBg="bg-teal-100"
+            className="bg-teal-50"
+          />
+          <StatCard
+            label="Highest"
+            value={ranked[0]?.avg?.toFixed(2) ?? "—"}
+            iconColor="text-emerald-700"
+            iconBg="bg-emerald-100"
+            className="bg-emerald-50"
+          />
+          <StatCard
+            label="Lowest"
+            value={ranked[ranked.length - 1]?.avg?.toFixed(2) ?? "—"}
+            iconColor="text-red-700"
+            iconBg="bg-red-100"
+            className="bg-red-50"
+          />
+          <StatCard
+            label="Passing"
+            value={`${passing}/${ranked.length}`}
+            iconColor="text-slate-600"
+            iconBg="bg-slate-100"
+            className="bg-white"
+          />
         </div>
 
         {/* Ranking table */}

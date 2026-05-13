@@ -17,7 +17,7 @@ import { formatDateTime, relativeTime } from "@/utils/dateUtils";
 import { getImportHistory, getImportDetails } from "@/services/api";
 import type { ImportLog } from "@/services/api";
 import { ROUTES } from "@/routes";
-import { useHeader } from "@/contexts/HeaderContext";
+import { useSetHeader } from "@/contexts/HeaderContext";
 
 // ── Import status helpers ──────────────────────────────────────────────────────
 
@@ -73,7 +73,7 @@ export function ImportHistoryList() {
     return matchSearch && matchYear && matchQuarter && matchSection && matchStatus;
   }).sort((a, b) => new Date(b.importedAt).getTime() - new Date(a.importedAt).getTime());
 
-  useHeader({
+  useSetHeader({
     title: "Import History",
     subtitle: `${filtered.length} import${filtered.length !== 1 ? "s" : ""} found`,
     breadcrumbs: [
@@ -256,7 +256,7 @@ export function ImportLogDetail() {
     );
   }
 
-  useHeader({
+  useSetHeader({
     title: log.fileName,
     subtitle: `Imported by ${log.importedBy} · ${formatDateTime(log.importedAt)}`,
     breadcrumbs: [

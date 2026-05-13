@@ -178,7 +178,12 @@ export default function Sidebar({ user: propUser, onLogout: propOnLogout, open: 
     return pathname === item.href;
   }
 
-  function isChildActive(href: string): boolean {
+  function isChildActive(href: string, parentHref: string): boolean {
+    // If the child href is the same as the parent href (e.g., /grades),
+    // only highlight it if it's an exact match.
+    if (href === parentHref) {
+      return pathname === href;
+    }
     return pathname === href || pathname.startsWith(href + "/");
   }
 
@@ -187,6 +192,7 @@ export default function Sidebar({ user: propUser, onLogout: propOnLogout, open: 
       className={`
         ${isPinned ? "w-64" : "w-20"}
         flex-shrink-0 transition-all duration-300 ease-in-out relative z-30
+        print:hidden
       `}
     >
       <div
@@ -268,7 +274,7 @@ export default function Sidebar({ user: propUser, onLogout: propOnLogout, open: 
                         className={`
                           w-full text-left px-3 py-2 rounded-lg
                           text-xs font-semibold transition-all
-                          ${isChildActive(child.href)
+                          ${isChildActive(child.href, item.href)
                             ? "text-teal-700 bg-teal-50/50"
                             : "text-slate-400 hover:text-slate-700 hover:bg-slate-50"
                           }

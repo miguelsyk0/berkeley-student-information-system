@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
-  ChevronRight, Save, X, BookMarked, Tag, Info,
+  ChevronRight, Save, X, BookMarked, Layers, Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,15 +12,44 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import type { Subject } from "../types";
+import { createSubject, updateSubject, type Subject } from "@/services/api";
+import type { SubjectCluster } from "../types";
 import { ROUTES } from "@/routes";
-import { useHeader } from "@/contexts/HeaderContext";
+import { useSetHeader } from "@/contexts/HeaderContext";
 import React from "react";
 
-// ── Mock MAPEH parent subjects for dropdown ────────────────────────────────────
+// ── Cluster Configuration ──────────────────────────────────────────────────────
 
-const MAPEH_PARENTS = [
-  { id: 7, name: "Psychomotor (MAPEH)" },
+export const CLUSTERS: {
+  value: SubjectCluster;
+  label: string;
+  color: string;
+  badgeClass: string;
+}[] = [
+  {
+    value: "Logical Analysis",
+    label: "Logical Analysis",
+    color: "bg-indigo-50 border-indigo-200",
+    badgeClass: "bg-indigo-100 text-indigo-700 border-0",
+  },
+  {
+    value: "Social Literacy",
+    label: "Social Literacy",
+    color: "bg-teal-50 border-teal-200",
+    badgeClass: "bg-teal-100 text-teal-700 border-0",
+  },
+  {
+    value: "Wika at Pagpapakatao",
+    label: "Wika at Pagpapakatao",
+    color: "bg-amber-50 border-amber-200",
+    badgeClass: "bg-amber-100 text-amber-700 border-0",
+  },
+  {
+    value: "Psychomotor",
+    label: "Psychomotor",
+    color: "bg-violet-50 border-violet-200",
+    badgeClass: "bg-violet-100 text-violet-700 border-0",
+  },
 ];
 
 // ── Field wrapper ──────────────────────────────────────────────────────────────
@@ -60,7 +89,19 @@ export default function SubjectForm() {
   const initial: Subject | null = state?.subject ?? null;
   const isEdit = !!initial;
 
-  useHeader({
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    code: initial?.code ?? "",
+    name: initial?.name ?? "",
+    displayName: initial?.displayName ?? "",
+    gradeLevel: initial?.gradeLevel ? String(initial.gradeLevel) : "7",
+    cluster: (initial?.cluster ?? "none") as SubjectCluster | "none",
+    isActive: initial?.isActive ?? true,
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useSetHeader({
     breadcrumbs: [
       { label: "Subjects", onClick: () => navigate(ROUTES.subjects.root) },
       { label: isEdit ? `Edit — ${initial?.name}` : "Add Subject" },
@@ -74,24 +115,14 @@ export default function SubjectForm() {
           size="sm"
           className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-800"
           onClick={handleSubmit}
+          disabled={loading}
         >
           <Save className="w-3.5 h-3.5" />
-          {isEdit ? "Save Changes" : "Add Subject"}
+          {loading ? "Saving..." : (isEdit ? "Save Changes" : "Add Subject")}
         </Button>
       </div>
     )
   });
-
-  const [form, setForm] = useState({
-    code: initial?.code ?? "",
-    name: initial?.name ?? "",
-    displayName: initial?.displayName ?? "",
-    isMapeh: initial?.isMapeh ?? false,
-    mapehParentId: initial?.mapehParentId ? String(initial.mapehParentId) : "none",
-    isActive: initial?.isActive ?? true,
-  });
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   function set<K extends keyof typeof form>(key: K, value: typeof form[K]) {
     setForm((p) => ({ ...p, [key]: value }));
@@ -100,23 +131,43 @@ export default function SubjectForm() {
 
   function validate(): boolean {
     const e: Record<string, string> = {};
+    if (!form.gradeLevel) e.gradeLevel = "Grade level is required.";
     if (!form.code.trim()) e.code = "Subject code is required.";
     if (form.code.length > 8) e.code = "Code must be 8 characters or less.";
     if (!form.name.trim()) e.name = "Subject name is required.";
     if (!form.displayName.trim()) e.displayName = "SF10 display name is required.";
-    if (form.isMapeh && form.mapehParentId === "none") {
-      e.mapehParentId = "Please select a MAPEH parent subject.";
-    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!validate()) return;
-    console.log("Save subject", form);
-    navigate(ROUTES.subjects.root);
+    setLoading(true);
+    try {
+      const payload = {
+        name: form.name,
+        code: form.code,
+        displayName: form.displayName,
+        gradeLevel: parseInt(form.gradeLevel),
+        cluster: form.cluster === "none" ? null : form.cluster,
+        isActive: form.isActive,
+      };
+
+      if (isEdit) {
+        await updateSubject(initial!.id, payload);
+      } else {
+        await createSubject(payload);
+      }
+      navigate(ROUTES.subjects.root);
+    } catch (err) {
+      console.error("Save subject error:", err);
+      alert("Failed to save subject. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
+  const activeCluster = CLUSTERS.find((c) => c.value === form.cluster);
 
   return (
     <div className="p-6 max-w-2xl space-y-5">
@@ -139,20 +190,46 @@ export default function SubjectForm() {
           </CardHeader>
           <CardContent className="px-6 pb-6 pt-4 space-y-4">
             {/* Code */}
-            <Field
-              label="Subject Code"
-              required
-              hint="Short internal identifier used in grade sheets"
-              error={errors.code}
-            >
-              <Input
-                value={form.code}
-                onChange={(e) => set("code", e.target.value.toUpperCase().slice(0, 8))}
-                placeholder="e.g. MATH, SCI, EL"
-                maxLength={8}
-                className={`h-9 text-sm font-mono border-slate-200 ${errors.code ? "border-red-400" : ""}`}
-              />
-            </Field>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-1">
+                <Field
+                  label="Grade Level"
+                  required
+                  error={errors.gradeLevel}
+                >
+                  <Select
+                    value={form.gradeLevel}
+                    onValueChange={(v) => set("gradeLevel", v)}
+                  >
+                    <SelectTrigger className={`h-9 text-sm border-slate-200 ${errors.gradeLevel ? "border-red-400" : ""}`}>
+                      <SelectValue placeholder="Grade..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[7, 8, 9, 10].map((gl) => (
+                        <SelectItem key={gl} value={String(gl)}>Grade {gl}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+
+              <div className="col-span-2">
+                <Field
+                  label="Subject Code"
+                  required
+                  hint="Short internal identifier"
+                  error={errors.code}
+                >
+                  <Input
+                    value={form.code}
+                    onChange={(e) => set("code", e.target.value.toUpperCase().slice(0, 8))}
+                    placeholder="e.g. MATH, SCI, EL"
+                    maxLength={8}
+                    className={`h-9 text-sm font-mono border-slate-200 ${errors.code ? "border-red-400" : ""}`}
+                  />
+                </Field>
+              </div>
+            </div>
 
             {/* Name */}
             <Field
@@ -195,8 +272,8 @@ export default function SubjectForm() {
                   <span className="text-sm font-semibold text-slate-700">{form.name || "Subject Name"}</span>
                   <ChevronRight className="w-3 h-3 text-slate-300" />
                   <span className="text-xs text-slate-500 italic">{form.displayName || "SF10 Name"}</span>
-                  {form.isMapeh && (
-                    <Badge className="bg-violet-100 text-violet-700 border-0 text-[10px]">MAPEH</Badge>
+                  {activeCluster && (
+                    <Badge className={`${activeCluster.badgeClass} text-[10px]`}>{activeCluster.label}</Badge>
                   )}
                 </div>
               </div>
@@ -204,55 +281,68 @@ export default function SubjectForm() {
           </CardContent>
         </Card>
 
-        {/* ── MAPEH Settings ── */}
+        {/* ── Cluster Settings ── */}
         <Card className="border-0 shadow-sm">
           <CardHeader className="pt-5 pb-0 px-6">
             <CardTitle className="text-sm font-black text-slate-700 flex items-center gap-2">
-              <Tag className="w-4 h-4 text-violet-500" />
-              MAPEH Settings
+              <Layers className="w-4 h-4 text-indigo-500" />
+              Cluster Assignment
             </CardTitle>
           </CardHeader>
           <CardContent className="px-6 pb-6 pt-4 space-y-4">
-            {/* MAPEH toggle */}
-            <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-              <div>
-                <p className="text-xs font-semibold text-slate-700">This is a MAPEH sub-subject</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Enable if this is Music, Arts, PE, or Health under a parent MAPEH subject.
-                </p>
-              </div>
-              <Switch
-                checked={form.isMapeh}
-                onCheckedChange={(v) => {
-                  set("isMapeh", v);
-                  if (!v) set("mapehParentId", "none");
-                }}
-              />
-            </div>
-
-            {/* Parent subject dropdown — only when isMapeh is true */}
-            {form.isMapeh && (
-              <Field
-                label="MAPEH Parent Subject"
-                required
-                error={errors.mapehParentId}
+            <Field
+              label="Cluster"
+              hint="Groups related subjects for tracking and filtering"
+            >
+              <Select
+                value={form.cluster ?? "none"}
+                onValueChange={(v) => set("cluster", v as SubjectCluster | "none")}
               >
-                <Select
-                  value={form.mapehParentId}
-                  onValueChange={(v) => set("mapehParentId", v)}
+                <SelectTrigger className="h-9 text-sm border-slate-200">
+                  <SelectValue placeholder="No cluster assigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-slate-400">No cluster</span>
+                  </SelectItem>
+                  {CLUSTERS.map((c) => (
+                    <SelectItem key={c.value!} value={c.value!}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            {/* Cluster color swatches */}
+            <div className="grid grid-cols-2 gap-2">
+              {CLUSTERS.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => set("cluster", form.cluster === c.value ? "none" : c.value)}
+                  className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all
+                    ${form.cluster === c.value
+                      ? `${c.color} ring-2 ring-offset-1 ${c.badgeClass.includes("indigo") ? "ring-indigo-300"
+                        : c.badgeClass.includes("teal") ? "ring-teal-300"
+                        : c.badgeClass.includes("amber") ? "ring-amber-300"
+                        : "ring-violet-300"}`
+                      : "bg-white border-slate-100 hover:bg-slate-50"
+                    }`}
                 >
-                  <SelectTrigger className={`h-9 text-sm border-slate-200 ${errors.mapehParentId ? "border-red-400" : ""}`}>
-                    <SelectValue placeholder="Select parent subject..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Select parent...</SelectItem>
-                    {MAPEH_PARENTS.map((p) => (
-                      <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            )}
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    c.badgeClass.includes("indigo") ? "bg-indigo-400"
+                    : c.badgeClass.includes("teal") ? "bg-teal-400"
+                    : c.badgeClass.includes("amber") ? "bg-amber-400"
+                    : "bg-violet-400"
+                  }`} />
+                  <span className="text-[11px] font-semibold text-slate-700">{c.label}</span>
+                  {form.cluster === c.value && (
+                    <span className="ml-auto text-[10px] font-bold text-slate-500">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
